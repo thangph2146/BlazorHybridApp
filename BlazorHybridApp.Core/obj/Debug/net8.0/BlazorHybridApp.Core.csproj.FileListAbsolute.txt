@@ -1,0 +1,17 @@
+/Users/ThangPham/HUB/BlazorHybridApp/BlazorHybridApp.Core/bin/Debug/net8.0/BlazorHybridApp.Core.deps.json
+/Users/ThangPham/HUB/BlazorHybridApp/BlazorHybridApp.Core/bin/Debug/net8.0/BlazorHybridApp.Core.dll
+/Users/ThangPham/HUB/BlazorHybridApp/BlazorHybridApp.Core/bin/Debug/net8.0/BlazorHybridApp.Core.pdb
+/Users/ThangPham/HUB/BlazorHybridApp/BlazorHybridApp.Core/bin/Debug/net8.0/BlazorHybridApp.Domain.dll
+/Users/ThangPham/HUB/BlazorHybridApp/BlazorHybridApp.Core/bin/Debug/net8.0/BlazorHybridApp.Domain.pdb
+/Users/ThangPham/HUB/BlazorHybridApp/BlazorHybridApp.Core/obj/Debug/net8.0/BlazorHybridApp.Core.csproj.AssemblyReference.cache
+/Users/ThangPham/HUB/BlazorHybridApp/BlazorHybridApp.Core/obj/Debug/net8.0/BlazorHybridApp.Core.GeneratedMSBuildEditorConfig.editorconfig
+/Users/ThangPham/HUB/BlazorHybridApp/BlazorHybridApp.Core/obj/Debug/net8.0/BlazorHybridApp.Core.AssemblyInfoInputs.cache
+/Users/ThangPham/HUB/BlazorHybridApp/BlazorHybridApp.Core/obj/Debug/net8.0/BlazorHybridApp.Core.AssemblyInfo.cs
+/Users/ThangPham/HUB/BlazorHybridApp/BlazorHybridApp.Core/obj/Debug/net8.0/BlazorHybridApp.Core.csproj.CoreCompileInputs.cache
+/Users/ThangPham/HUB/BlazorHybridApp/BlazorHybridApp.Core/obj/Debug/net8.0/BlazorHy.FA027494.Up2Date
+/Users/ThangPham/HUB/BlazorHybridApp/BlazorHybridApp.Core/obj/Debug/net8.0/BlazorHybridApp.Core.dll
+/Users/ThangPham/HUB/BlazorHybridApp/BlazorHybridApp.Core/obj/Debug/net8.0/refint/BlazorHybridApp.Core.dll
+/Users/ThangPham/HUB/BlazorHybridApp/BlazorHybridApp.Core/obj/Debug/net8.0/BlazorHybridApp.Core.pdb
+/Users/ThangPham/HUB/BlazorHybridApp/BlazorHybridApp.Core/obj/Debug/net8.0/ref/BlazorHybridApp.Core.dll
+/Users/ThangPham/HUB/BlazorHybridApp/BlazorHybridApp.Core/bin/Debug/net8.0/BlazorHybridApp.Core.runtimeconfig.json
+/Users/ThangPham/HUB/BlazorHybridApp/BlazorHybridApp.Core/obj/Debug/net8.0/BlazorHybridApp.Core.genruntimeconfig.cache

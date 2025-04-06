@@ -1,0 +1,41 @@
+{
+  "Files": [
+    {
+      "Id": "/Users/ThangPham/HUB/BlazorHybridApp/BlazorHybridApp.Web/obj/Debug/net8.0/scopedcss/projectbundle/BlazorHybridApp.Web.bundle.scp.css",
+      "PackagePath": "staticwebassets/BlazorHybridApp.Web.bundle.scp.css"
+    },
+    {
+      "Id": "/Users/ThangPham/HUB/BlazorHybridApp/BlazorHybridApp.Web/wwwroot/app.css",
+      "PackagePath": "staticwebassets/app.css"
+    },
+    {
+      "Id": "/Users/ThangPham/HUB/BlazorHybridApp/BlazorHybridApp.Web/wwwroot/bootstrap/bootstrap.min.css",
+      "PackagePath": "staticwebassets/bootstrap/bootstrap.min.css"
+    },
+    {
+      "Id": "/Users/ThangPham/HUB/BlazorHybridApp/BlazorHybridApp.Web/wwwroot/bootstrap/bootstrap.min.css.map",
+      "PackagePath": "staticwebassets/bootstrap/bootstrap.min.css.map"
+    },
+    {
+      "Id": "/Users/ThangPham/HUB/BlazorHybridApp/BlazorHybridApp.Web/wwwroot/favicon.png",
+      "PackagePath": "staticwebassets/favicon.png"
+    },
+    {
+      "Id": "obj/Debug/net8.0/staticwebassets/msbuild.BlazorHybridApp.Web.Microsoft.AspNetCore.StaticWebAssets.props",
+      "PackagePath": "build\\Microsoft.AspNetCore.StaticWebAssets.props"
+    },
+    {
+      "Id": "obj/Debug/net8.0/staticwebassets/msbuild.build.BlazorHybridApp.Web.props",
+      "PackagePath": "build\\BlazorHybridApp.Web.props"
+    },
+    {
+      "Id": "obj/Debug/net8.0/staticwebassets/msbuild.buildMultiTargeting.BlazorHybridApp.Web.props",
+      "PackagePath": "buildMultiTargeting\\BlazorHybridApp.Web.props"
+    },
+    {
+      "Id": "obj/Debug/net8.0/staticwebassets/msbuild.buildTransitive.BlazorHybridApp.Web.props",
+      "PackagePath": "buildTransitive\\BlazorHybridApp.Web.props"
+    }
+  ],
+  "ElementsToRemove": []
+}

@@ -1,0 +1,98 @@
+@page "/products"
+@using BlazorHybridApp.Domain.Entities
+@rendermode InteractiveAuto
+@inject HttpClient Http
+
+<PageTitle>Sản phẩm</PageTitle>
+
+<h1>Danh sách sản phẩm</h1>
+
+@if (products == null)
+{
+    <p><em>Đang tải...</em></p>
+}
+else
+{
+    <div class="row mb-3">
+        <div class="col">
+            <div class="input-group">
+                <input type="text" class="form-control" placeholder="Tìm kiếm sản phẩm..." @bind="searchTerm" @bind:event="oninput" />
+                <button class="btn btn-outline-secondary" type="button" @onclick="FilterProducts">
+                    <i class="oi oi-magnifying-glass"></i> Tìm
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        @foreach (var product in filteredProducts)
+        {
+            <div class="col-md-4 mb-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">@product.Name</h5>
+                        <h6 class="card-subtitle mb-2 text-muted">@(product.Category?.Name ?? "Không có danh mục")</h6>
+                        <p class="card-text">@(product.Description ?? "Không có mô tả")</p>
+                        <p class="card-text"><strong>Giá: </strong>@product.Price.ToString("N0") VND</p>
+                        <p class="card-text"><strong>Tồn kho: </strong>@product.Stock</p>
+                    </div>
+                    <div class="card-footer">
+                        <div class="d-flex justify-content-between">
+                            <button class="btn btn-primary btn-sm" @onclick="() => ViewProductDetails(product.Id)">
+                                Chi tiết
+                            </button>
+                            <button class="btn btn-success btn-sm" @onclick="() => AddToCart(product)">
+                                Thêm vào giỏ
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private List<Product>? products;
+    private List<Product>? filteredProducts;
+    private string searchTerm = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            products = await Http.GetFromJsonAsync<List<Product>>("api/products");
+            filteredProducts = products;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading products: {ex.Message}");
+            // Trong môi trường thực tế, bạn nên xử lý lỗi tốt hơn
+        }
+    }
+
+    private void FilterProducts()
+    {
+        if (string.IsNullOrWhiteSpace(searchTerm))
+        {
+            filteredProducts = products;
+        }
+        else
+        {
+            filteredProducts = products?
+                .Where(p => p.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                           (p.Description != null && p.Description.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)))
+                .ToList();
+        }
+    }
+
+    private void ViewProductDetails(int productId)
+    {
+        // Chuyển hướng đến trang chi tiết sản phẩm
+    }
+
+    private void AddToCart(Product product)
+    {
+        // Thêm sản phẩm vào giỏ hàng
+    }
+} 

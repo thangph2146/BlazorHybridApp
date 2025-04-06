@@ -1,0 +1,163 @@
+@page "/categories"
+@using BlazorHybridApp.Domain.Entities
+@using System.Net.Http.Json
+@inject HttpClient Http
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Categories</PageTitle>
+
+<h1>Categories</h1>
+
+<div class="mb-3">
+    <button class="btn btn-primary" @onclick="() => ShowAddModal = true">Add Category</button>
+</div>
+
+@if (categories == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Description</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var category in categories)
+                {
+                    <tr>
+                        <td>@category.Id</td>
+                        <td>@category.Name</td>
+                        <td>@category.Description</td>
+                        <td>@(category.IsActive ? "Active" : "Inactive")</td>
+                        <td>
+                            <button class="btn btn-sm btn-primary" @onclick="() => EditCategory(category)">Edit</button>
+                            <button class="btn btn-sm btn-danger" @onclick="() => DeleteCategory(category.Id)">Delete</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@if (ShowAddModal)
+{
+    <div class="modal fade show" style="display: block;" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@(editingCategory.Id == 0 ? "Add Category" : "Edit Category")</h5>
+                    <button type="button" class="btn-close" @onclick="CloseModal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="name" class="form-label">Name</label>
+                        <input type="text" class="form-control" id="name" @bind="editingCategory.Name" />
+                    </div>
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Description</label>
+                        <textarea class="form-control" id="description" @bind="editingCategory.Description"></textarea>
+                    </div>
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="isActive" @bind="editingCategory.IsActive" />
+                        <label class="form-check-label" for="isActive">Active</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseModal">Close</button>
+                    <button type="button" class="btn btn-primary" @onclick="SaveCategory">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop fade show"></div>
+}
+
+@code {
+    private List<Category>? categories;
+    private Category editingCategory = new Category();
+    private bool ShowAddModal = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCategories();
+    }
+
+    private async Task LoadCategories()
+    {
+        try
+        {
+            categories = await Http.GetFromJsonAsync<List<Category>>("api/categories");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading categories: {ex.Message}");
+        }
+    }
+
+    private void EditCategory(Category category)
+    {
+        editingCategory = new Category
+        {
+            Id = category.Id,
+            Name = category.Name,
+            Description = category.Description,
+            IsActive = category.IsActive
+        };
+        ShowAddModal = true;
+    }
+
+    private async Task SaveCategory()
+    {
+        try
+        {
+            if (editingCategory.Id == 0)
+            {
+                // Create new category
+                await Http.PostAsJsonAsync("api/categories", editingCategory);
+            }
+            else
+            {
+                // Update existing category
+                await Http.PutAsJsonAsync($"api/categories/{editingCategory.Id}", editingCategory);
+            }
+
+            await LoadCategories();
+            CloseModal();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error saving category: {ex.Message}");
+        }
+    }
+
+    private async Task DeleteCategory(int id)
+    {
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", "Are you sure you want to delete this category?"))
+            return;
+
+        try
+        {
+            await Http.DeleteAsync($"api/categories/{id}");
+            await LoadCategories();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error deleting category: {ex.Message}");
+        }
+    }
+
+    private void CloseModal()
+    {
+        ShowAddModal = false;
+        editingCategory = new Category();
+    }
+} 
