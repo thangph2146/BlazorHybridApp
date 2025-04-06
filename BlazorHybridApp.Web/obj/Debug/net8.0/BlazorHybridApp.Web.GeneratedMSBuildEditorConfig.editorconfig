@@ -30,6 +30,10 @@ build_metadata.AdditionalFiles.CssScope =
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9Db3VudGVyLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
+[/Users/ThangPham/HUB/BlazorHybridApp/BlazorHybridApp.Web/Components/Pages/Departments/DepartmentList.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9EZXBhcnRtZW50cy9EZXBhcnRtZW50TGlzdC5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
 [/Users/ThangPham/HUB/BlazorHybridApp/BlazorHybridApp.Web/Components/Pages/Error.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9FcnJvci5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
@@ -46,8 +50,20 @@ build_metadata.AdditionalFiles.CssScope =
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9PcmRlcnMvT3JkZXJMaXN0LnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
+[/Users/ThangPham/HUB/BlazorHybridApp/BlazorHybridApp.Web/Components/Pages/Permissions/PermissionList.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9QZXJtaXNzaW9ucy9QZXJtaXNzaW9uTGlzdC5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[/Users/ThangPham/HUB/BlazorHybridApp/BlazorHybridApp.Web/Components/Pages/Permissions/UserPermissions.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9QZXJtaXNzaW9ucy9Vc2VyUGVybWlzc2lvbnMucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
 [/Users/ThangPham/HUB/BlazorHybridApp/BlazorHybridApp.Web/Components/Pages/Products/ProductList.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9Qcm9kdWN0cy9Qcm9kdWN0TGlzdC5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[/Users/ThangPham/HUB/BlazorHybridApp/BlazorHybridApp.Web/Components/Pages/Users/UserList.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9Vc2Vycy9Vc2VyTGlzdC5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
 [/Users/ThangPham/HUB/BlazorHybridApp/BlazorHybridApp.Web/Components/Pages/Weather.razor]

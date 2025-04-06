@@ -4,12 +4,12 @@ namespace BlazorHybridApp.Core.Interfaces
 {
     public interface IUserService
     {
-        Task<IEnumerable<User>> GetAllUsersAsync();
-        Task<User?> GetUserByIdAsync(int id);
-        Task<User?> GetUserByEmailAsync(string email);
-        Task<User> CreateUserAsync(User user);
-        Task<User> UpdateUserAsync(User user);
-        Task<bool> DeleteUserAsync(int id);
+        Task<IEnumerable<AppUser>> GetAllUsersAsync();
+        Task<AppUser?> GetUserByIdAsync(string id);
+        Task<AppUser?> GetUserByEmailAsync(string email);
+        Task<AppUser> CreateUserAsync(AppUser user, string password);
+        Task<AppUser> UpdateUserAsync(AppUser user, string password = null);
+        Task<bool> DeleteUserAsync(string id);
         Task<bool> AuthenticateUserAsync(string email, string password);
     }
 } 

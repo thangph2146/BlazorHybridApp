@@ -1,0 +1,766 @@
+@page "/departments"
+@using BlazorHybridApp.Domain.Entities
+@using System.Net.Http.Json
+@inject HttpClient Http
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Quản lý phòng ban</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Quản lý phòng ban</h1>
+    <button class="btn btn-primary" @onclick="() => ShowDepartmentDialog(null)">
+        <i class="bi bi-plus-circle"></i> Thêm phòng ban
+    </button>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row mb-3">
+            <div class="col-md-8">
+                <div class="input-group">
+                    <input type="text" class="form-control" placeholder="Tìm kiếm phòng ban..." @bind="searchTerm" @bind:event="oninput" @onkeyup="HandleSearch" />
+                    <button class="btn btn-outline-secondary" type="button" @onclick="SearchDepartments">
+                        <i class="bi bi-search"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <select class="form-select" @bind="activeFilter">
+                    <option value="">Tất cả trạng thái</option>
+                    <option value="true">Hoạt động</option>
+                    <option value="false">Không hoạt động</option>
+                </select>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+        @errorMessage
+        <button type="button" class="btn-close" @onclick="() => errorMessage = string.Empty"></button>
+    </div>
+}
+
+@if (isLoading)
+{
+    <div class="d-flex justify-content-center my-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Đang tải...</span>
+        </div>
+        <span class="ms-2">Đang tải dữ liệu...</span>
+    </div>
+}
+else if (departments == null)
+{
+    <div class="d-flex justify-content-center">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Đang tải...</span>
+        </div>
+    </div>
+}
+else if (!departments.Any())
+{
+    <div class="alert alert-info">
+        <i class="bi bi-info-circle"></i> Không tìm thấy phòng ban nào.
+    </div>
+}
+else
+{
+    <div class="row">
+        @foreach (var department in filteredDepartments)
+        {
+            <div class="col-md-4 mb-4">
+                <div class="card h-100">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">@department.Name</h5>
+                        <span class="badge @(department.IsActive ? "bg-success" : "bg-danger")">
+                            @(department.IsActive ? "Hoạt động" : "Không hoạt động")
+                        </span>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-text">@(string.IsNullOrEmpty(department.Description) ? "Không có mô tả." : department.Description)</p>
+                        <p class="card-text">
+                            <small class="text-muted">Ngày tạo: @department.CreatedAt.ToString("dd/MM/yyyy")</small>
+                        </p>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span>
+                                <i class="bi bi-people"></i> @(department.Users?.Count ?? 0) thành viên
+                            </span>
+                            <div class="btn-group">
+                                <button class="btn btn-sm btn-primary" @onclick="() => ShowDepartmentDialog(department)">
+                                    <i class="bi bi-pencil"></i> Sửa
+                                </button>
+                                <button class="btn btn-sm btn-danger" @onclick="() => ConfirmDeleteDepartment(department)">
+                                    <i class="bi bi-trash"></i> Xóa
+                                </button>
+                                <button class="btn btn-sm btn-info" @onclick="() => ViewDepartmentUsers(department.Id)">
+                                    <i class="bi bi-people"></i> Xem thành viên
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+    
+    <div class="d-flex justify-content-between align-items-center mt-4">
+        <div>
+            Hiển thị @filteredDepartments.Count() / @departments.Count() phòng ban
+        </div>
+        <nav aria-label="Page navigation">
+            <ul class="pagination">
+                <li class="page-item @(currentPage == 1 ? "disabled" : "")">
+                    <button class="page-link" @onclick="() => ChangePage(currentPage - 1)" disabled="@(currentPage == 1)">Trước</button>
+                </li>
+                
+                @for (int i = 1; i <= totalPages; i++)
+                {
+                    var pageNumber = i;
+                    <li class="page-item @(pageNumber == currentPage ? "active" : "")">
+                        <button class="page-link" @onclick="() => ChangePage(pageNumber)">@pageNumber</button>
+                    </li>
+                }
+                
+                <li class="page-item @(currentPage == totalPages ? "disabled" : "")">
+                    <button class="page-link" @onclick="() => ChangePage(currentPage + 1)" disabled="@(currentPage == totalPages)">Sau</button>
+                </li>
+            </ul>
+        </nav>
+    </div>
+}
+
+@if (showDialog)
+{
+    <div class="modal fade show" style="display: block;" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@(selectedDepartment == null ? "Thêm phòng ban mới" : "Chỉnh sửa phòng ban")</h5>
+                    <button type="button" class="btn-close" @onclick="CloseDialog"></button>
+                </div>
+                <div class="modal-body">
+                    <EditForm Model="departmentModel" OnValidSubmit="SaveDepartment">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary />
+                        
+                        <div class="mb-3">
+                            <label for="name" class="form-label">Tên phòng ban</label>
+                            <InputText id="name" class="form-control" @bind-Value="departmentModel.Name" />
+                            <ValidationMessage For="@(() => departmentModel.Name)" />
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="description" class="form-label">Mô tả</label>
+                            <InputTextArea id="description" class="form-control" @bind-Value="departmentModel.Description" rows="3" />
+                            <ValidationMessage For="@(() => departmentModel.Description)" />
+                        </div>
+                        
+                        <div class="mb-3 form-check">
+                            <InputCheckbox id="isActive" class="form-check-input" @bind-Value="departmentModel.IsActive" />
+                            <label for="isActive" class="form-check-label">Trạng thái hoạt động</label>
+                            <ValidationMessage For="@(() => departmentModel.IsActive)" />
+                        </div>
+                        
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" @onclick="CloseDialog">Hủy</button>
+                            <button type="submit" class="btn btn-primary">
+                                @(selectedDepartment == null ? "Thêm" : "Lưu thay đổi")
+                            </button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop fade show"></div>
+}
+
+@if (showDeleteConfirm)
+{
+    <div class="modal fade show" style="display: block;" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Xác nhận xóa</h5>
+                    <button type="button" class="btn-close" @onclick="CloseDeleteConfirm"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Bạn có chắc chắn muốn xóa phòng ban <strong>@selectedDepartment?.Name</strong>?</p>
+                    
+                    @if (selectedDepartment?.Users?.Any() == true)
+                    {
+                        <div class="alert alert-warning">
+                            <i class="bi bi-exclamation-triangle"></i> Phòng ban này hiện có @selectedDepartment.Users.Count thành viên. Xóa phòng ban sẽ xóa tất cả liên kết với người dùng.
+                        </div>
+                    }
+                    
+                    <p class="text-danger">Hành động này không thể hoàn tác.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseDeleteConfirm">Hủy</button>
+                    <button type="button" class="btn btn-danger" @onclick="DeleteDepartment">Xác nhận xóa</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop fade show"></div>
+}
+
+@if (showUsersDialog)
+{
+    <div class="modal fade show" style="display: block;" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Thành viên phòng ban: @selectedDepartment?.Name</h5>
+                    <button type="button" class="btn-close" @onclick="CloseUsersDialog"></button>
+                </div>
+                <div class="modal-body">
+                    @if (departmentUsers == null)
+                    {
+                        <div class="d-flex justify-content-center">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Đang tải...</span>
+                            </div>
+                        </div>
+                    }
+                    else if (!departmentUsers.Any())
+                    {
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle"></i> Phòng ban này chưa có thành viên nào.
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Họ tên</th>
+                                        <th>Email</th>
+                                        <th>Vai trò</th>
+                                        <th>Trạng thái</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var user in departmentUsers)
+                                    {
+                                        <tr>
+                                            <td>@user.FullName</td>
+                                            <td>@user.Email</td>
+                                            <td>
+                                                @if (userRoles.ContainsKey(user.Id))
+                                                {
+                                                    <span class="badge bg-info">@string.Join(", ", userRoles[user.Id])</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-secondary">N/A</span>
+                                                }
+                                            </td>
+                                            <td>
+                                                @if (user.IsActive)
+                                                {
+                                                    <span class="badge bg-success">Hoạt động</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-danger">Vô hiệu</span>
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseUsersDialog">Đóng</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop fade show"></div>
+}
+
+<div class="card mt-4 mb-4">
+    <div class="card-header bg-primary text-white">
+        <h5 class="mb-0">Công cụ kiểm tra dữ liệu phòng ban</h5>
+    </div>
+    <div class="card-body">
+        <div class="form-check form-switch mb-3">
+            <input class="form-check-input" type="checkbox" @bind="showDebugInfo" id="debugSwitch">
+            <label class="form-check-label" for="debugSwitch">Hiển thị thông tin debug</label>
+        </div>
+        
+        @if (showDebugInfo)
+        {
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0">Dữ liệu phòng ban (@(departments?.Count ?? 0) bản ghi)</h6>
+                        </div>
+                        <div class="card-body">
+                            <pre style="max-height: 300px; overflow: auto;">@(System.Text.Json.JsonSerializer.Serialize(departments, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }))</pre>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0">Dữ liệu người dùng của phòng ban (@(departmentUsers?.Count ?? 0) bản ghi)</h6>
+                        </div>
+                        <div class="card-body">
+                            <pre style="max-height: 300px; overflow: auto;">@(System.Text.Json.JsonSerializer.Serialize(departmentUsers, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }))</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row mt-3">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0">Kiểm tra API</h6>
+                            <button class="btn btn-primary btn-sm" @onclick="RefreshAllData">Làm mới dữ liệu</button>
+                        </div>
+                        <div class="card-body">
+                            <div class="input-group mb-3">
+                                <input type="text" class="form-control" placeholder="Endpoint cần kiểm tra (ví dụ: api/departments)" @bind="testApiEndpoint">
+                                <button class="btn btn-outline-secondary" type="button" @onclick="TestApiEndpoint">Kiểm tra</button>
+                            </div>
+                            
+                            @if (!string.IsNullOrEmpty(testApiResult))
+                            {
+                                <div class="alert @(testApiSuccess ? "alert-success" : "alert-danger")">
+                                    <pre style="max-height: 200px; overflow: auto;">@testApiResult</pre>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h6 class="mb-0">Thông tin lọc & phân trang</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <p><strong>Tìm kiếm:</strong> @searchTerm</p>
+                            <p><strong>Trạng thái:</strong> @activeFilter</p>
+                        </div>
+                        <div class="col-md-4">
+                            <p><strong>Trang hiện tại:</strong> @currentPage</p>
+                            <p><strong>Kích thước trang:</strong> @pageSize</p>
+                            <p><strong>Tổng số trang:</strong> @totalPages</p>
+                        </div>
+                        <div class="col-md-4">
+                            <p><strong>Tổng số phòng ban:</strong> @(departments?.Count ?? 0)</p>
+                            <p><strong>Số phòng ban đã lọc:</strong> @filteredDepartments.Count()</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private List<Department>? departments;
+    private Department? selectedDepartment;
+    private DepartmentModel departmentModel = new();
+    private bool showDialog;
+    private bool showDeleteConfirm;
+    private bool showUsersDialog;
+    private List<UserDto>? departmentUsers;
+    private Dictionary<string, List<string>> userRoles = new();
+    
+    // Filtering
+    private string searchTerm = "";
+    private string activeFilter = "";
+    private IEnumerable<Department> filteredDepartments => FilterDepartments();
+    
+    // Pagination
+    private int currentPage = 1;
+    private int pageSize = 6;
+    private int totalPages => (int)Math.Ceiling(filteredDepartments.Count() / (double)pageSize);
+    
+    // Debug properties
+    private bool showDebugInfo = false;
+    private string testApiEndpoint = "api/departments";
+    private string testApiResult = "";
+    private bool testApiSuccess = false;
+    
+    // Thêm biến trạng thái tải và thông báo lỗi
+    private bool isLoading = true;
+    private string errorMessage = "";
+    
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadInitialData();
+    }
+    
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            if (!string.IsNullOrEmpty(errorMessage))
+            {
+                await JSRuntime.InvokeVoidAsync("console.error", errorMessage);
+            }
+        }
+    }
+    
+    private async Task LoadInitialData()
+    {
+        isLoading = true;
+        errorMessage = "";
+        try
+        {
+            await LoadDepartments();
+            if (departments != null && departments.Count > 0)
+            {
+                await GetDepartmentUsers(departments[0].Id);
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Lỗi khi tải dữ liệu: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+    
+    private async Task LoadDepartments()
+    {
+        try 
+        {
+            departments = await Http.GetFromJsonAsync<List<Department>>("api/departments");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Lỗi tải phòng ban: {ex.Message}";
+            departments = new List<Department>();
+        }
+    }
+    
+    private void ShowDepartmentDialog(Department? department)
+    {
+        selectedDepartment = department;
+        
+        if (department == null)
+        {
+            // Creating new department
+            departmentModel = new DepartmentModel
+            {
+                IsActive = true
+            };
+        }
+        else
+        {
+            // Editing existing department
+            departmentModel = new DepartmentModel
+            {
+                Name = department.Name,
+                Description = department.Description,
+                IsActive = department.IsActive
+            };
+        }
+        
+        showDialog = true;
+    }
+    
+    private void CloseDialog()
+    {
+        showDialog = false;
+        selectedDepartment = null;
+    }
+    
+    private async Task SaveDepartment()
+    {
+        try
+        {
+            if (selectedDepartment == null)
+            {
+                // Create new department
+                await Http.PostAsJsonAsync("api/departments", departmentModel);
+                errorMessage = "Phòng ban đã được tạo thành công!";
+            }
+            else
+            {
+                // Update existing department
+                await Http.PutAsJsonAsync($"api/departments/{selectedDepartment.Id}", departmentModel);
+                errorMessage = "Cập nhật phòng ban thành công!";
+            }
+            
+            CloseDialog();
+            await LoadDepartments();
+            
+            // Chỉ gọi JavaScript sau khi render
+            await Task.Delay(100); // Đợi một chút để component render
+            await JSRuntime.InvokeVoidAsync("alert", errorMessage);
+            errorMessage = string.Empty;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Lỗi: {ex.Message}";
+            StateHasChanged();
+        }
+    }
+    
+    private void ConfirmDeleteDepartment(Department department)
+    {
+        selectedDepartment = department;
+        showDeleteConfirm = true;
+    }
+    
+    private void CloseDeleteConfirm()
+    {
+        showDeleteConfirm = false;
+        selectedDepartment = null;
+    }
+    
+    private async Task DeleteDepartment()
+    {
+        if (selectedDepartment != null)
+        {
+            try
+            {
+                await Http.DeleteAsync($"api/departments/{selectedDepartment.Id}");
+                errorMessage = "Phòng ban đã được xóa thành công!";
+                CloseDeleteConfirm();
+                await LoadDepartments();
+                
+                // Chỉ gọi JavaScript sau khi render
+                await Task.Delay(100); // Đợi một chút để component render
+                await JSRuntime.InvokeVoidAsync("alert", errorMessage);
+                errorMessage = string.Empty;
+            }
+            catch (Exception ex)
+            {
+                errorMessage = $"Lỗi khi xóa phòng ban: {ex.Message}";
+                StateHasChanged();
+            }
+        }
+    }
+    
+    private async Task ViewDepartmentUsers(int departmentId)
+    {
+        selectedDepartment = departments?.FirstOrDefault(d => d.Id == departmentId);
+        
+        if (selectedDepartment != null)
+        {
+            try 
+            {
+                isLoading = true;
+                errorMessage = "";
+                StateHasChanged();
+                
+                departmentUsers = await Http.GetFromJsonAsync<List<UserDto>>($"api/departments/{departmentId}/users") ?? new List<UserDto>();
+                
+                // Load roles for each user
+                foreach (var user in departmentUsers ?? Enumerable.Empty<UserDto>())
+                {
+                    try
+                    {
+                        var response = await Http.GetFromJsonAsync<UserRolesResponse>($"api/users/{user.Id}/roles");
+                        if (response != null && response.Roles != null)
+                        {
+                            userRoles[user.Id] = response.Roles;
+                        }
+                    }
+                    catch
+                    {
+                        errorMessage += $"Không thể tải vai trò cho người dùng {user.Id}. ";
+                        userRoles[user.Id] = new List<string>();
+                    }
+                }
+                
+                showUsersDialog = true;
+            }
+            catch (Exception ex)
+            {
+                errorMessage = $"Lỗi khi tải danh sách thành viên: {ex.Message}";
+                StateHasChanged();
+            }
+            finally
+            {
+                isLoading = false;
+            }
+        }
+    }
+    
+    private async Task GetDepartmentUsers(int departmentId)
+    {
+        try 
+        {
+            departmentUsers = await Http.GetFromJsonAsync<List<UserDto>>($"api/departments/{departmentId}/users") ?? new List<UserDto>();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Lỗi khi tải dữ liệu người dùng: {ex.Message}";
+            departmentUsers = new List<UserDto>();
+        }
+    }
+    
+    private void CloseUsersDialog()
+    {
+        showUsersDialog = false;
+        departmentUsers = null;
+    }
+    
+    private void ChangePage(int page)
+    {
+        if (page < 1 || page > totalPages)
+            return;
+            
+        currentPage = page;
+    }
+    
+    private void HandleSearch(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+            SearchDepartments();
+    }
+    
+    private void SearchDepartments()
+    {
+        currentPage = 1;
+    }
+    
+    private IEnumerable<Department> FilterDepartments()
+    {
+        if (departments == null)
+            return Enumerable.Empty<Department>();
+            
+        var filtered = departments.AsEnumerable();
+        
+        // Apply search filter
+        if (!string.IsNullOrWhiteSpace(searchTerm))
+        {
+            var term = searchTerm.Trim().ToLower();
+            filtered = filtered.Where(d => 
+                (d.Name?.ToLower()?.Contains(term) ?? false) || 
+                (d.Description != null && d.Description.ToLower().Contains(term))
+            );
+        }
+        
+        // Apply active filter
+        if (!string.IsNullOrEmpty(activeFilter))
+        {
+            bool isActive = activeFilter.Equals("true", StringComparison.OrdinalIgnoreCase);
+            filtered = filtered.Where(d => d.IsActive == isActive);
+        }
+        
+        // Apply pagination
+        var paged = filtered
+            .Skip((currentPage - 1) * pageSize)
+            .Take(pageSize);
+            
+        return paged;
+    }
+    
+    public class DepartmentModel
+    {
+        public string Name { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public bool IsActive { get; set; } = true;
+    }
+    
+    public class UserDto
+    {
+        public string Id { get; set; } = string.Empty;
+        public string UserName { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string FirstName { get; set; } = string.Empty;
+        public string LastName { get; set; } = string.Empty;
+        public string FullName { get; set; } = string.Empty;
+        public string? PhoneNumber { get; set; }
+        public bool IsActive { get; set; }
+    }
+    
+    public class UserRolesResponse
+    {
+        public List<string> Roles { get; set; } = new List<string>();
+    }
+    
+    private async Task TestApiEndpoint()
+    {
+        try
+        {
+            testApiResult = "Đang tải...";
+            testApiSuccess = true;
+            StateHasChanged();
+            
+            var response = await Http.GetAsync(testApiEndpoint);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                testApiSuccess = true;
+                var content = await response.Content.ReadAsStringAsync();
+                // Prettify JSON if it's valid
+                try 
+                {
+                    var jsonObj = System.Text.Json.JsonDocument.Parse(content);
+                    content = System.Text.Json.JsonSerializer.Serialize(
+                        jsonObj, 
+                        new System.Text.Json.JsonSerializerOptions { WriteIndented = true }
+                    );
+                }
+                catch (Exception jsonEx)
+                {
+                    errorMessage = $"Lỗi khi phân tích JSON: {jsonEx.Message}";
+                    StateHasChanged();
+                }
+                
+                testApiResult = content;
+            }
+            else
+            {
+                testApiSuccess = false;
+                testApiResult = $"Lỗi: {response.StatusCode} - {await response.Content.ReadAsStringAsync()}";
+            }
+        }
+        catch (Exception ex)
+        {
+            testApiSuccess = false;
+            testApiResult = $"Lỗi: {ex.Message}";
+            errorMessage = $"Lỗi kiểm tra API: {ex.Message}";
+            StateHasChanged();
+        }
+    }
+    
+    private async Task RefreshAllData()
+    {
+        try
+        {
+            await LoadInitialData();
+            if (departments != null && departments.Count > 0)
+            {
+                await GetDepartmentUsers(departments[0].Id);
+            }
+            
+            errorMessage = "Đã làm mới dữ liệu thành công!";
+            
+            // Chỉ gọi JavaScript sau khi render
+            await Task.Delay(100); // Đợi một chút để component render
+            await JSRuntime.InvokeVoidAsync("alert", errorMessage);
+            errorMessage = string.Empty;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Lỗi khi làm mới dữ liệu: {ex.Message}";
+            StateHasChanged();
+        }
+    }
+} 

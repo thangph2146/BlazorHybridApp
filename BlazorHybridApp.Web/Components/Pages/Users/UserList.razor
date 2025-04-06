@@ -1,0 +1,768 @@
+@page "/users"
+@using BlazorHybridApp.Domain.Entities
+@using System.Net.Http.Json
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Quản lý người dùng</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Quản lý người dùng</h1>
+    <button class="btn btn-primary" @onclick="() => ShowUserDialog(null)">
+        <i class="bi bi-plus-circle"></i> Thêm người dùng
+    </button>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row mb-3">
+            <div class="col-md-4">
+                <div class="input-group">
+                    <input type="text" class="form-control" placeholder="Tìm kiếm..." @bind="searchTerm" @bind:event="oninput" @onkeyup="HandleSearch" />
+                    <button class="btn btn-outline-secondary" type="button" @onclick="SearchUsers">
+                        <i class="bi bi-search"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <select class="form-select" @bind="selectedDepartment">
+                    <option value="">Tất cả phòng ban</option>
+                    @foreach (var department in departments)
+                    {
+                        <option value="@department.Id">@department.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-3">
+                <select class="form-select" @bind="selectedRole">
+                    <option value="">Tất cả vai trò</option>
+                    <option value="Administrator">Administrator</option>
+                    <option value="Manager">Manager</option>
+                    <option value="Employee">Employee</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button class="btn btn-outline-primary w-100" @onclick="SearchUsers">Lọc</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+        @errorMessage
+        <button type="button" class="btn-close" @onclick="() => errorMessage = string.Empty"></button>
+    </div>
+}
+
+@if (isLoading)
+{
+    <div class="d-flex justify-content-center my-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Đang tải...</span>
+        </div>
+        <span class="ms-2">Đang tải dữ liệu...</span>
+    </div>
+}
+else if (users == null)
+{
+    <div class="d-flex justify-content-center">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Đang tải...</span>
+        </div>
+    </div>
+}
+else if (!users.Any())
+{
+    <div class="alert alert-info">
+        <i class="bi bi-info-circle"></i> Không tìm thấy người dùng nào.
+    </div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped table-hover">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Họ tên</th>
+                    <th>Email</th>
+                    <th>Phòng ban</th>
+                    <th>Vai trò</th>
+                    <th>Trạng thái</th>
+                    <th>Tùy chọn</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var user in filteredUsers)
+                {
+                    <tr>
+                        <td>@(string.IsNullOrEmpty(user.Id) ? "N/A" : (user.Id.Length > 8 ? user.Id.Substring(0, 8) + "..." : user.Id))</td>
+                        <td>@user.FullName</td>
+                        <td>@user.Email</td>
+                        <td>@GetDepartmentName(user.DepartmentId)</td>
+                        <td>
+                            @if (userRoles.ContainsKey(user.Id))
+                            {
+                                <span class="badge bg-info">@string.Join(", ", userRoles[user.Id])</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-secondary">N/A</span>
+                            }
+                        </td>
+                        <td>
+                            @if (user.IsActive)
+                            {
+                                <span class="badge bg-success">Hoạt động</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-danger">Vô hiệu</span>
+                            }
+                        </td>
+                        <td>
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-sm btn-primary" @onclick="() => ShowUserDialog(user)">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <button class="btn btn-sm btn-danger" @onclick="() => ConfirmDeleteUser(user)">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                                <button class="btn btn-sm btn-info" @onclick="() => NavigateToUserPermissions(user.Id)">
+                                    <i class="bi bi-shield"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            Hiển thị @filteredUsers.Count() / @users.Count() người dùng
+        </div>
+        <nav aria-label="Page navigation">
+            <ul class="pagination">
+                <li class="page-item @(currentPage == 1 ? "disabled" : "")">
+                    <button class="page-link" @onclick="() => ChangePage(currentPage - 1)" disabled="@(currentPage == 1)">Trước</button>
+                </li>
+                
+                @for (int i = 1; i <= totalPages; i++)
+                {
+                    var pageNumber = i;
+                    <li class="page-item @(pageNumber == currentPage ? "active" : "")">
+                        <button class="page-link" @onclick="() => ChangePage(pageNumber)">@pageNumber</button>
+                    </li>
+                }
+                
+                <li class="page-item @(currentPage == totalPages ? "disabled" : "")">
+                    <button class="page-link" @onclick="() => ChangePage(currentPage + 1)" disabled="@(currentPage == totalPages)">Sau</button>
+                </li>
+            </ul>
+        </nav>
+    </div>
+}
+
+@if (showDialog)
+{
+    <div class="modal fade show" style="display: block;" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@(selectedUser == null ? "Thêm người dùng mới" : "Chỉnh sửa người dùng")</h5>
+                    <button type="button" class="btn-close" @onclick="CloseDialog"></button>
+                </div>
+                <div class="modal-body">
+                    <EditForm Model="userModel" OnValidSubmit="SaveUser">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary />
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="firstName" class="form-label">Họ</label>
+                                <InputText id="firstName" class="form-control" @bind-Value="userModel.FirstName" />
+                                <ValidationMessage For="@(() => userModel.FirstName)" />
+                            </div>
+                            <div class="col-md-6">
+                                <label for="lastName" class="form-label">Tên</label>
+                                <InputText id="lastName" class="form-control" @bind-Value="userModel.LastName" />
+                                <ValidationMessage For="@(() => userModel.LastName)" />
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="email" class="form-label">Email</label>
+                            <InputText id="email" class="form-control" @bind-Value="userModel.Email" />
+                            <ValidationMessage For="@(() => userModel.Email)" />
+                        </div>
+                        
+                        @if (selectedUser == null)
+                        {
+                            <div class="mb-3">
+                                <label for="password" class="form-label">Mật khẩu</label>
+                                <InputText id="password" type="password" class="form-control" @bind-Value="userModel.Password" />
+                                <ValidationMessage For="@(() => userModel.Password)" />
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="mb-3">
+                                <label for="password" class="form-label">Mật khẩu mới (để trống nếu không thay đổi)</label>
+                                <InputText id="password" type="password" class="form-control" @bind-Value="userModel.Password" />
+                            </div>
+                        }
+                        
+                        <div class="mb-3">
+                            <label for="phoneNumber" class="form-label">Số điện thoại</label>
+                            <InputText id="phoneNumber" class="form-control" @bind-Value="userModel.PhoneNumber" />
+                            <ValidationMessage For="@(() => userModel.PhoneNumber)" />
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="address" class="form-label">Địa chỉ</label>
+                            <InputTextArea id="address" class="form-control" @bind-Value="userModel.Address" rows="2" />
+                            <ValidationMessage For="@(() => userModel.Address)" />
+                        </div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="department" class="form-label">Phòng ban</label>
+                                <InputSelect id="department" class="form-select" @bind-Value="userModel.DepartmentId">
+                                    <option value="">-- Chọn phòng ban --</option>
+                                    @foreach (var department in departments)
+                                    {
+                                        <option value="@department.Id">@department.Name</option>
+                                    }
+                                </InputSelect>
+                                <ValidationMessage For="@(() => userModel.DepartmentId)" />
+                            </div>
+                            <div class="col-md-6">
+                                <label for="role" class="form-label">Vai trò</label>
+                                <InputSelect id="role" class="form-select" @bind-Value="userModel.Role">
+                                    <option value="">-- Chọn vai trò --</option>
+                                    <option value="Administrator">Administrator</option>
+                                    <option value="Manager">Manager</option>
+                                    <option value="Employee">Employee</option>
+                                </InputSelect>
+                                <ValidationMessage For="@(() => userModel.Role)" />
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3 form-check">
+                            <InputCheckbox id="isActive" class="form-check-input" @bind-Value="userModel.IsActive" />
+                            <label for="isActive" class="form-check-label">Trạng thái hoạt động</label>
+                            <ValidationMessage For="@(() => userModel.IsActive)" />
+                        </div>
+                        
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" @onclick="CloseDialog">Hủy</button>
+                            <button type="submit" class="btn btn-primary">
+                                @(selectedUser == null ? "Thêm" : "Lưu thay đổi")
+                            </button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop fade show"></div>
+}
+
+@if (showDeleteConfirm)
+{
+    <div class="modal fade show" style="display: block;" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Xác nhận xóa</h5>
+                    <button type="button" class="btn-close" @onclick="CloseDeleteConfirm"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Bạn có chắc chắn muốn xóa người dùng <strong>@selectedUser?.FullName</strong>?</p>
+                    <p class="text-danger">Hành động này không thể hoàn tác.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseDeleteConfirm">Hủy</button>
+                    <button type="button" class="btn btn-danger" @onclick="DeleteUser">Xác nhận xóa</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop fade show"></div>
+}
+
+<div class="card mt-4 mb-4">
+    <div class="card-header bg-primary text-white">
+        <h5 class="mb-0">Công cụ kiểm tra dữ liệu</h5>
+    </div>
+    <div class="card-body">
+        <div class="form-check form-switch mb-3">
+            <input class="form-check-input" type="checkbox" @bind="showDebugInfo" id="debugSwitch">
+            <label class="form-check-label" for="debugSwitch">Hiển thị thông tin debug</label>
+        </div>
+        
+        @if (showDebugInfo)
+        {
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0">Dữ liệu người dùng (@(users?.Count ?? 0) bản ghi)</h6>
+                        </div>
+                        <div class="card-body">
+                            <pre style="max-height: 300px; overflow: auto;">@(System.Text.Json.JsonSerializer.Serialize(users, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }))</pre>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0">Dữ liệu vai trò (@userRoles.Count bản ghi)</h6>
+                        </div>
+                        <div class="card-body">
+                            <pre style="max-height: 300px; overflow: auto;">@(System.Text.Json.JsonSerializer.Serialize(userRoles, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }))</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h6 class="mb-0">Dữ liệu phòng ban (@(departments?.Count ?? 0) bản ghi)</h6>
+                </div>
+                <div class="card-body">
+                    <pre style="max-height: 300px; overflow: auto;">@(System.Text.Json.JsonSerializer.Serialize(departments, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }))</pre>
+                </div>
+            </div>
+            
+            <div class="card mt-3">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">Kiểm tra API</h6>
+                    <button class="btn btn-primary btn-sm" @onclick="RefreshAllData">Làm mới dữ liệu</button>
+                </div>
+                <div class="card-body">
+                    <div class="input-group mb-3">
+                        <input type="text" class="form-control" placeholder="Endpoint cần kiểm tra (ví dụ: api/users)" @bind="testApiEndpoint">
+                        <button class="btn btn-outline-secondary" type="button" @onclick="TestApiEndpoint">Kiểm tra</button>
+                    </div>
+                    
+                    @if (!string.IsNullOrEmpty(testApiResult))
+                    {
+                        <div class="alert @(testApiSuccess ? "alert-success" : "alert-danger")">
+                            <pre style="max-height: 200px; overflow: auto;">@testApiResult</pre>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private List<UserDto>? users;
+    private List<Department> departments = new List<Department>();
+    private Dictionary<string, List<string>> userRoles = new();
+    private UserDto? selectedUser;
+    private UserModel userModel = new();
+    private bool showDialog;
+    private bool showDeleteConfirm;
+    
+    // Filtering
+    private string searchTerm = "";
+    private string selectedRole = "";
+    private int? selectedDepartment;
+    private IEnumerable<UserDto> filteredUsers => FilterUsers();
+    
+    // Pagination
+    private int currentPage = 1;
+    private int pageSize = 10;
+    private int totalPages => (int)Math.Ceiling(filteredUsers.Count() / (double)pageSize);
+    
+    // Debug properties
+    private bool showDebugInfo = false;
+    private string testApiEndpoint = "api/users";
+    private string testApiResult = "";
+    private bool testApiSuccess = false;
+    
+    private bool isLoading = true;
+    private string errorMessage = "";
+    private bool isFirstRender = true;
+    
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadInitialData();
+    }
+    
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            isFirstRender = false;
+            if (!string.IsNullOrEmpty(errorMessage))
+            {
+                await JSRuntime.InvokeVoidAsync("console.error", errorMessage);
+            }
+        }
+    }
+    
+    private async Task LoadInitialData()
+    {
+        isLoading = true;
+        errorMessage = "";
+        try
+        {
+            await LoadUsers();
+            await LoadDepartments();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Lỗi khi tải dữ liệu: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+    
+    private async Task LoadUsers()
+    {
+        try 
+        {
+            users = await Http.GetFromJsonAsync<List<UserDto>>("api/users") ?? new List<UserDto>();
+            
+            // Load roles for each user
+            userRoles.Clear();
+            foreach (var user in users ?? Enumerable.Empty<UserDto>())
+            {
+                try
+                {
+                    var response = await Http.GetFromJsonAsync<UserRolesResponse>($"api/users/{user.Id}/roles");
+                    if (response != null && response.Roles != null)
+                    {
+                        userRoles[user.Id] = response.Roles;
+                    }
+                }
+                catch
+                {
+                    // Just log to errorMessage instead of direct JS call
+                    errorMessage += $"Không thể tải vai trò cho người dùng {user.Id}. ";
+                    userRoles[user.Id] = new List<string>();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage += $"Lỗi tải người dùng: {ex.Message}. ";
+            users = new List<UserDto>();
+        }
+    }
+    
+    private async Task LoadDepartments()
+    {
+        try
+        {
+            var result = await Http.GetFromJsonAsync<List<Department>>("api/departments");
+            if (result != null)
+            {
+                departments = result;
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage += $"Lỗi tải phòng ban: {ex.Message}. ";
+            // departments already initialized as empty list
+        }
+    }
+    
+    private void ShowUserDialog(UserDto? user)
+    {
+        selectedUser = user;
+        
+        if (user == null)
+        {
+            // Creating new user
+            userModel = new UserModel();
+        }
+        else
+        {
+            // Editing existing user
+            userModel = new UserModel
+            {
+                FirstName = user.FirstName,
+                LastName = user.LastName,
+                Email = user.Email,
+                PhoneNumber = user.PhoneNumber,
+                Address = user.Address,
+                DepartmentId = user.DepartmentId,
+                IsActive = user.IsActive,
+                Role = userRoles.ContainsKey(user.Id) && userRoles[user.Id].Any() ? userRoles[user.Id].First() : ""
+            };
+        }
+        
+        showDialog = true;
+    }
+    
+    private void CloseDialog()
+    {
+        showDialog = false;
+        selectedUser = null;
+    }
+    
+    private async Task SaveUser()
+    {
+        try
+        {
+            if (selectedUser == null)
+            {
+                // Create new user
+                await Http.PostAsJsonAsync("api/users", userModel);
+                errorMessage = "Người dùng đã được tạo thành công!";
+            }
+            else
+            {
+                // Update existing user
+                await Http.PutAsJsonAsync($"api/users/{selectedUser.Id}", userModel);
+                errorMessage = "Cập nhật người dùng thành công!";
+            }
+            
+            CloseDialog();
+            await LoadUsers();
+            
+            // Chỉ gọi JavaScript sau khi render
+            await Task.Delay(100); // Đợi một chút để component render
+            await JSRuntime.InvokeVoidAsync("alert", errorMessage);
+            errorMessage = string.Empty;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Lỗi: {ex.Message}";
+            StateHasChanged();
+        }
+    }
+    
+    private void ConfirmDeleteUser(UserDto user)
+    {
+        selectedUser = user;
+        showDeleteConfirm = true;
+    }
+    
+    private void CloseDeleteConfirm()
+    {
+        showDeleteConfirm = false;
+        selectedUser = null;
+    }
+    
+    private async Task DeleteUser()
+    {
+        if (selectedUser != null)
+        {
+            try
+            {
+                await Http.DeleteAsync($"api/users/{selectedUser.Id}");
+                errorMessage = "Người dùng đã được xóa thành công!";
+                CloseDeleteConfirm();
+                await LoadUsers();
+                
+                // Chỉ gọi JavaScript sau khi render
+                await Task.Delay(100); // Đợi một chút để component render
+                await JSRuntime.InvokeVoidAsync("alert", errorMessage);
+                errorMessage = string.Empty;
+            }
+            catch (Exception ex)
+            {
+                errorMessage = $"Lỗi khi xóa người dùng: {ex.Message}";
+                StateHasChanged();
+            }
+        }
+    }
+    
+    private void NavigateToUserPermissions(string userId)
+    {
+        NavigationManager.NavigateTo($"/permissions/user/{userId}");
+    }
+    
+    private string GetDepartmentName(int? departmentId)
+    {
+        if (departmentId == null)
+            return "N/A";
+            
+        var department = departments.FirstOrDefault(d => d.Id == departmentId);
+        return department?.Name ?? "N/A";
+    }
+    
+    private void ChangePage(int page)
+    {
+        if (page < 1 || page > totalPages)
+            return;
+            
+        currentPage = page;
+    }
+    
+    private void HandleSearch(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+            SearchUsers();
+    }
+    
+    private void SearchUsers()
+    {
+        currentPage = 1;
+    }
+    
+    private IEnumerable<UserDto> FilterUsers()
+    {
+        if (users == null)
+            return Enumerable.Empty<UserDto>();
+            
+        var filtered = users.AsEnumerable();
+        
+        // Apply search filter
+        if (!string.IsNullOrWhiteSpace(searchTerm))
+        {
+            var term = searchTerm.Trim().ToLower();
+            filtered = filtered.Where(u => 
+                (u.FullName?.ToLower()?.Contains(term) ?? false) || 
+                (u.Email?.ToLower()?.Contains(term) ?? false) ||
+                (u.PhoneNumber?.ToLower()?.Contains(term) ?? false)
+            );
+        }
+        
+        // Apply department filter
+        if (selectedDepartment.HasValue)
+        {
+            filtered = filtered.Where(u => u.DepartmentId == selectedDepartment);
+        }
+        
+        // Apply role filter
+        if (!string.IsNullOrEmpty(selectedRole))
+        {
+            filtered = filtered.Where(u => 
+                !string.IsNullOrEmpty(u.Id) &&
+                userRoles.ContainsKey(u.Id) && 
+                userRoles[u.Id]?.Contains(selectedRole) == true
+            );
+        }
+        
+        // Apply pagination
+        var paged = filtered
+            .Skip((currentPage - 1) * pageSize)
+            .Take(pageSize);
+            
+        return paged;
+    }
+    
+    private async Task TestApiEndpoint()
+    {
+        try
+        {
+            testApiResult = "Đang tải...";
+            testApiSuccess = true;
+            StateHasChanged();
+            
+            var response = await Http.GetAsync(testApiEndpoint);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                testApiSuccess = true;
+                var content = await response.Content.ReadAsStringAsync();
+                // Prettify JSON if it's valid
+                try 
+                {
+                    var jsonObj = System.Text.Json.JsonDocument.Parse(content);
+                    content = System.Text.Json.JsonSerializer.Serialize(
+                        jsonObj, 
+                        new System.Text.Json.JsonSerializerOptions { WriteIndented = true }
+                    );
+                }
+                catch (Exception jsonEx)
+                {
+                    errorMessage = $"Lỗi khi phân tích JSON: {jsonEx.Message}";
+                    StateHasChanged();
+                }
+                
+                testApiResult = content;
+            }
+            else
+            {
+                testApiSuccess = false;
+                testApiResult = $"Lỗi: {response.StatusCode} - {await response.Content.ReadAsStringAsync()}";
+            }
+        }
+        catch (Exception ex)
+        {
+            testApiSuccess = false;
+            testApiResult = $"Lỗi: {ex.Message}";
+            errorMessage = $"Lỗi kiểm tra API: {ex.Message}";
+            StateHasChanged();
+        }
+    }
+    
+    private async Task RefreshAllData()
+    {
+        try
+        {
+            await LoadInitialData();
+            errorMessage = "Đã làm mới dữ liệu thành công!";
+            
+            // Chỉ gọi JavaScript sau khi render
+            await Task.Delay(100); // Đợi một chút để component render
+            await JSRuntime.InvokeVoidAsync("alert", errorMessage);
+            errorMessage = string.Empty;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Lỗi khi làm mới dữ liệu: {ex.Message}";
+            StateHasChanged();
+        }
+    }
+    
+    public class UserDto
+    {
+        public string Id { get; set; } = string.Empty;
+        public string UserName { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string FirstName { get; set; } = string.Empty;
+        public string LastName { get; set; } = string.Empty;
+        public string FullName { get; set; } = string.Empty;
+        public string? PhoneNumber { get; set; }
+        public string? Address { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public DateTime? LastLoginAt { get; set; }
+        public bool IsActive { get; set; }
+        public int? DepartmentId { get; set; }
+    }
+    
+    public class UserModel
+    {
+        public string FirstName { get; set; } = string.Empty;
+        public string LastName { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string? Password { get; set; }
+        public string? PhoneNumber { get; set; }
+        public string? Address { get; set; }
+        public int? DepartmentId { get; set; }
+        public bool IsActive { get; set; } = true;
+        public string Role { get; set; } = string.Empty;
+    }
+    
+    public class UserRolesResponse
+    {
+        public List<string> Roles { get; set; } = new List<string>();
+    }
+    
+    public class Department
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public bool IsActive { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public DateTime? UpdatedAt { get; set; }
+    }
+} 

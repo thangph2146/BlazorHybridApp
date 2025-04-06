@@ -1,6 +1,10 @@
 using BlazorHybridApp.Core.Interfaces;
 using BlazorHybridApp.Domain.Entities;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace BlazorHybridApp.Api.Controllers
 {
@@ -9,10 +13,12 @@ namespace BlazorHybridApp.Api.Controllers
     public class UsersController : ControllerBase
     {
         private readonly IUserService _userService;
+        private readonly UserManager<AppUser> _userManager;
 
-        public UsersController(IUserService userService)
+        public UsersController(IUserService userService, UserManager<AppUser> userManager)
         {
             _userService = userService;
+            _userManager = userManager;
         }
 
         [HttpGet]
@@ -23,7 +29,7 @@ namespace BlazorHybridApp.Api.Controllers
         }
 
         [HttpGet("{id}")]
-        public async Task<ActionResult<UserDto>> GetUser(int id)
+        public async Task<ActionResult<UserDto>> GetUser(string id)
         {
             var user = await _userService.GetUserByIdAsync(id);
             if (user == null)
@@ -47,35 +53,54 @@ namespace BlazorHybridApp.Api.Controllers
         }
 
         [HttpPost]
-        public async Task<ActionResult<UserDto>> CreateUser(User user)
+        public async Task<ActionResult<UserDto>> CreateUser(CreateUserModel model)
         {
             // Check if email already exists
-            var existingUser = await _userService.GetUserByEmailAsync(user.Email);
+            var existingUser = await _userService.GetUserByEmailAsync(model.Email);
             if (existingUser != null)
             {
                 return BadRequest("Email already registered");
             }
 
-            var createdUser = await _userService.CreateUserAsync(user);
+            var user = new AppUser
+            {
+                UserName = model.Email,
+                Email = model.Email,
+                FirstName = model.FirstName,
+                LastName = model.LastName,
+                PhoneNumber = model.PhoneNumber,
+                Address = model.Address,
+                DepartmentId = model.DepartmentId
+            };
+
+            var createdUser = await _userService.CreateUserAsync(user, model.Password);
             
             return CreatedAtAction(nameof(GetUser), new { id = createdUser.Id }, ConvertToDto(createdUser));
         }
 
         [HttpPut("{id}")]
-        public async Task<ActionResult<UserDto>> UpdateUser(int id, User user)
+        public async Task<ActionResult<UserDto>> UpdateUser(string id, UpdateUserModel model)
         {
-            if (id != user.Id)
+            var user = await _userService.GetUserByIdAsync(id);
+            if (user == null)
             {
-                return BadRequest();
+                return NotFound();
             }
 
-            var updatedUser = await _userService.UpdateUserAsync(user);
+            user.FirstName = model.FirstName;
+            user.LastName = model.LastName;
+            user.Email = model.Email;
+            user.PhoneNumber = model.PhoneNumber;
+            user.Address = model.Address;
+            user.DepartmentId = model.DepartmentId;
+            
+            var updatedUser = await _userService.UpdateUserAsync(user, model.Password);
             
             return Ok(ConvertToDto(updatedUser));
         }
 
         [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteUser(int id)
+        public async Task<IActionResult> DeleteUser(string id)
         {
             var result = await _userService.DeleteUserAsync(id);
             if (!result)
@@ -101,23 +126,33 @@ namespace BlazorHybridApp.Api.Controllers
                 return Unauthorized();
             }
             
-            return Ok(new { user = ConvertToDto(user) });
+            // Lấy danh sách roles của user
+            var roles = await _userManager.GetRolesAsync(user);
+            
+            return Ok(new 
+            { 
+                user = ConvertToDto(user),
+                roles = roles
+            });
         }
 
-        // Helper method to convert User to UserDto (without password)
-        private UserDto ConvertToDto(User user)
+        // Helper method to convert AppUser to UserDto (without password)
+        private UserDto ConvertToDto(AppUser user)
         {
             return new UserDto
             {
                 Id = user.Id,
-                Name = user.Name,
+                UserName = user.UserName,
                 Email = user.Email,
+                FirstName = user.FirstName,
+                LastName = user.LastName,
+                FullName = user.FullName,
+                PhoneNumber = user.PhoneNumber,
                 Address = user.Address,
-                Phone = user.Phone,
                 CreatedAt = user.CreatedAt,
                 LastLoginAt = user.LastLoginAt,
                 IsActive = user.IsActive,
-                Role = user.Role
+                DepartmentId = user.DepartmentId
             };
         }
     }
@@ -125,20 +160,45 @@ namespace BlazorHybridApp.Api.Controllers
     // DTO for User without password
     public class UserDto
     {
-        public int Id { get; set; }
-        public string Name { get; set; } = string.Empty;
+        public string Id { get; set; } = string.Empty;
+        public string UserName { get; set; } = string.Empty;
         public string Email { get; set; } = string.Empty;
+        public string FirstName { get; set; } = string.Empty;
+        public string LastName { get; set; } = string.Empty;
+        public string FullName { get; set; } = string.Empty;
+        public string? PhoneNumber { get; set; }
         public string? Address { get; set; }
-        public string? Phone { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime? LastLoginAt { get; set; }
         public bool IsActive { get; set; }
-        public string? Role { get; set; }
+        public int? DepartmentId { get; set; }
     }
 
     public class AuthRequest
     {
         public string Email { get; set; } = string.Empty;
         public string Password { get; set; } = string.Empty;
+    }
+    
+    public class CreateUserModel
+    {
+        public string Email { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
+        public string FirstName { get; set; } = string.Empty;
+        public string LastName { get; set; } = string.Empty;
+        public string? PhoneNumber { get; set; }
+        public string? Address { get; set; }
+        public int? DepartmentId { get; set; }
+    }
+    
+    public class UpdateUserModel
+    {
+        public string Email { get; set; } = string.Empty;
+        public string? Password { get; set; }
+        public string FirstName { get; set; } = string.Empty;
+        public string LastName { get; set; } = string.Empty;
+        public string? PhoneNumber { get; set; }
+        public string? Address { get; set; }
+        public int? DepartmentId { get; set; }
     }
 } 

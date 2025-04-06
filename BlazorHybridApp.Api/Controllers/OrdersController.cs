@@ -47,7 +47,7 @@ namespace BlazorHybridApp.Api.Controllers
         }
 
         [HttpGet("user/{userId}")]
-        public async Task<ActionResult<IEnumerable<Order>>> GetOrdersByUser(int userId)
+        public async Task<ActionResult<IEnumerable<Order>>> GetOrdersByUser(string userId)
         {
             var orders = await _orderService.GetOrdersByUserIdAsync(userId);
             return Ok(orders);

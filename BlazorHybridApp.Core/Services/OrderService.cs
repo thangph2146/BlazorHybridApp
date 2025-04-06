@@ -28,7 +28,7 @@ namespace BlazorHybridApp.Core.Services
                 .FirstOrDefaultAsync(o => o.Id == id);
         }
 
-        public async Task<IEnumerable<Order>> GetOrdersByUserIdAsync(int userId)
+        public async Task<IEnumerable<Order>> GetOrdersByUserIdAsync(string userId)
         {
             return await _context.Orders
                 .Where(o => o.UserId == userId)

@@ -13,31 +13,56 @@
                 <span class="bi bi-house-door-fill" aria-hidden="true"></span> Home
             </NavLink>
         </div>
+        
+        <!-- Administration Section -->
         <div class="nav-item px-3">
-            <NavLink class="nav-link" href="counter">
-                <span class="bi bi-plus-square-fill" aria-hidden="true"></span> Counter
+            <h5 class="nav-section-title px-3 mb-1 mt-2">Quản trị</h5>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="users">
+                <span class="bi bi-people-fill" aria-hidden="true"></span> Người dùng
             </NavLink>
         </div>
         <div class="nav-item px-3">
-            <NavLink class="nav-link" href="weather">
-                <span class="bi bi-list-nested" aria-hidden="true"></span> Weather
+            <NavLink class="nav-link" href="departments">
+                <span class="bi bi-building" aria-hidden="true"></span> Phòng ban
             </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="permissions">
+                <span class="bi bi-shield-lock" aria-hidden="true"></span> Phân quyền
+            </NavLink>
+        </div>
+        
+        <!-- Data Management Section -->
+        <div class="nav-item px-3">
+            <h5 class="nav-section-title px-3 mb-1 mt-3">Dữ liệu</h5>
         </div>
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="products">
-                <span class="bi bi-box-seam" aria-hidden="true"></span> Products
+                <span class="bi bi-box-seam" aria-hidden="true"></span> Sản phẩm
             </NavLink>
         </div>
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="categories">
-                <span class="bi bi-tags" aria-hidden="true"></span> Categories
+                <span class="bi bi-tags" aria-hidden="true"></span> Danh mục
             </NavLink>
         </div>
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="orders">
-                <span class="bi bi-cart" aria-hidden="true"></span> Orders
+                <span class="bi bi-cart" aria-hidden="true"></span> Đơn hàng
             </NavLink>
         </div>
     </nav>
 </div>
+
+<style>
+    .nav-section-title {
+        color: #adb5bd;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border-bottom: 1px solid #444;
+    }
+</style>
 

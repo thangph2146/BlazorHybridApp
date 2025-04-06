@@ -10,3 +10,4 @@
 /Users/ThangPham/HUB/BlazorHybridApp/BlazorHybridApp.Domain/obj/Debug/net8.0/BlazorHybridApp.Domain.pdb
 /Users/ThangPham/HUB/BlazorHybridApp/BlazorHybridApp.Domain/obj/Debug/net8.0/ref/BlazorHybridApp.Domain.dll
 /Users/ThangPham/HUB/BlazorHybridApp/BlazorHybridApp.Domain/obj/Debug/net8.0/BlazorHybridApp.Domain.sourcelink.json
+/Users/ThangPham/HUB/BlazorHybridApp/BlazorHybridApp.Domain/obj/Debug/net8.0/BlazorHybridApp.Domain.csproj.AssemblyReference.cache

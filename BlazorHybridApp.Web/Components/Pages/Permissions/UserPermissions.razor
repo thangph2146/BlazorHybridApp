@@ -1,0 +1,945 @@
+@page "/permissions/users"
+@page "/permissions/user/{UserId:int}"
+@using BlazorHybridApp.Domain.Entities
+@using System.Net.Http.Json
+@using Microsoft.AspNetCore.Components
+@using System.Text.Json
+
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Quản lý quyền người dùng</PageTitle>
+
+<div class="container-fluid">
+    <div class="row mb-3">
+        <div class="col">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1>Quản lý quyền người dùng</h1>
+            </div>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="/">Trang chủ</a></li>
+                    <li class="breadcrumb-item"><a href="/permissions">Phân quyền</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Quyền người dùng</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            @errorMessage
+            <button type="button" class="btn-close" @onclick="() => errorMessage = string.Empty"></button>
+        </div>
+    }
+
+    @if (isLoading)
+    {
+        <div class="d-flex justify-content-center my-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Đang tải...</span>
+            </div>
+            <span class="ms-2">Đang tải dữ liệu...</span>
+        </div>
+    }
+    else
+    {
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">Chọn người dùng</h5>
+            </div>
+            <div class="card-body">
+                @if (isLoadingUsers)
+                {
+                    <div class="text-center my-4">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Đang tải...</span>
+                        </div>
+                        <p class="mt-2">Đang tải danh sách người dùng...</p>
+                    </div>
+                }
+                else
+                {
+                    <div class="row align-items-center">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="userSelect" class="form-label">Người dùng:</label>
+                                <select class="form-select" id="userSelect" @bind="selectedUserId" @bind:after="HandleUserChange">
+                                    <option value="0">--- Chọn người dùng ---</option>
+                                    @foreach (var user in users)
+                                    {
+                                        <option value="@user.Id">@user.FullName (@user.Email)</option>
+                                    }
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            @if (selectedUser != null)
+                            {
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h5 class="card-title">@selectedUser.FullName</h5>
+                                        <p class="card-text">
+                                            <strong>Email:</strong> @selectedUser.Email<br />
+                                            <strong>Phòng ban:</strong> @(selectedUser.DepartmentName ?? "Chưa có phòng ban")<br />
+                                            <strong>Vai trò:</strong> @(string.Join(", ", selectedUser.Roles))<br />
+                                            <strong>Trạng thái:</strong>
+                                            @if (selectedUser.IsActive)
+                                            {
+                                                <span class="badge bg-success">Đang hoạt động</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-danger">Không hoạt động</span>
+                                            }
+                                        </p>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        @if (selectedUser != null)
+        {
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Quyền của người dùng: @selectedUser.FullName</h5>
+                    <button class="btn btn-light" @onclick="() => ShowAddPermissionDialog()">
+                        <i class="bi bi-plus-circle"></i> Thêm quyền
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-md-8">
+                            <div class="input-group">
+                                <input type="text" class="form-control" placeholder="Tìm kiếm quyền..." @bind="searchTerm" @bind:event="oninput">
+                                <button class="btn btn-outline-secondary" type="button" @onclick="ApplyFilters">
+                                    <i class="bi bi-search"></i> Tìm kiếm
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <select class="form-select" @bind="selectedType" @bind:after="ApplyFilters">
+                                <option value="">Tất cả loại quyền</option>
+                                <option value="Read">Đọc</option>
+                                <option value="Create">Tạo mới</option>
+                                <option value="Update">Cập nhật</option>
+                                <option value="Delete">Xóa</option>
+                                <option value="Admin">Quản trị</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    @if (isLoadingPermissions)
+                    {
+                        <div class="text-center my-4">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Đang tải...</span>
+                            </div>
+                            <p class="mt-2">Đang tải danh sách quyền...</p>
+                        </div>
+                    }
+                    else if (filteredUserPermissions.Any())
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover">
+                                <thead class="table-primary">
+                                    <tr>
+                                        <th>Mã quyền</th>
+                                        <th>Tên quyền</th>
+                                        <th>Loại</th>
+                                        <th>Phạm vi</th>
+                                        <th>Ngày gán</th>
+                                        <th>Tùy chọn</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var permission in currentItems)
+                                    {
+                                        <tr>
+                                            <td>@permission.Code</td>
+                                            <td>@permission.Name</td>
+                                            <td>
+                                                @switch (permission.Type)
+                                                {
+                                                    case "Read":
+                                                        <span class="badge bg-info">Đọc</span>
+                                                        break;
+                                                    case "Create":
+                                                        <span class="badge bg-success">Tạo mới</span>
+                                                        break;
+                                                    case "Update":
+                                                        <span class="badge bg-warning">Cập nhật</span>
+                                                        break;
+                                                    case "Delete":
+                                                        <span class="badge bg-danger">Xóa</span>
+                                                        break;
+                                                    case "Admin":
+                                                        <span class="badge bg-dark">Quản trị</span>
+                                                        break;
+                                                    default:
+                                                        <span class="badge bg-secondary">@permission.Type</span>
+                                                        break;
+                                                }
+                                            </td>
+                                            <td>
+                                                @switch (permission.Scope)
+                                                {
+                                                    case "All":
+                                                        <span class="badge bg-primary">Toàn hệ thống</span>
+                                                        break;
+                                                    case "Department":
+                                                        <span class="badge bg-info">Phòng ban</span>
+                                                        break;
+                                                    case "Self":
+                                                        <span class="badge bg-secondary">Cá nhân</span>
+                                                        break;
+                                                    default:
+                                                        <span class="badge bg-secondary">@permission.Scope</span>
+                                                        break;
+                                                }
+                                            </td>
+                                            <td>@permission.AssignedDate.ToString("dd/MM/yyyy")</td>
+                                            <td>
+                                                <div class="btn-group" role="group">
+                                                    <button class="btn btn-sm btn-outline-warning" @onclick="() => EditUserPermission(permission)">
+                                                        <i class="bi bi-pencil"></i>
+                                                    </button>
+                                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => ConfirmDeleteUserPermission(permission)">
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+
+                        @if (totalPages > 1)
+                        {
+                            <nav aria-label="Page navigation">
+                                <ul class="pagination justify-content-center">
+                                    <li class="page-item @(currentPage == 1 ? "disabled" : "")">
+                                        <button class="page-link" @onclick="() => ChangePage(currentPage - 1)" disabled="@(currentPage == 1)">
+                                            <i class="bi bi-chevron-left"></i>
+                                        </button>
+                                    </li>
+                                    @for (int i = 1; i <= totalPages; i++)
+                                    {
+                                        int pageNumber = i;
+                                        <li class="page-item @(pageNumber == currentPage ? "active" : "")">
+                                            <button class="page-link" @onclick="() => ChangePage(pageNumber)">@pageNumber</button>
+                                        </li>
+                                    }
+                                    <li class="page-item @(currentPage == totalPages ? "disabled" : "")">
+                                        <button class="page-link" @onclick="() => ChangePage(currentPage + 1)" disabled="@(currentPage == totalPages)">
+                                            <i class="bi bi-chevron-right"></i>
+                                        </button>
+                                    </li>
+                                </ul>
+                            </nav>
+                        }
+                    }
+                    else
+                    {
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle"></i> Không tìm thấy quyền nào. Hãy thêm quyền mới cho người dùng này.
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+        else if (!isLoadingUsers && selectedUserId == "0")
+        {
+            <div class="alert alert-warning">
+                <i class="bi bi-exclamation-triangle"></i> Vui lòng chọn một người dùng để xem và quản lý quyền.
+            </div>
+        }
+    }
+</div>
+
+@if (showPermissionDialog)
+{
+    <div class="modal fade show" style="display: block;" tabindex="-1" role="dialog">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">@(isEditing ? "Cập nhật quyền" : "Thêm quyền cho người dùng")</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="ClosePermissionDialog" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group mb-3">
+                        <label for="permissionSelect" class="form-label">Quyền:</label>
+                        <select class="form-select" id="permissionSelect" @bind="selectedPermissionModel.PermissionId">
+                            <option value="0">--- Chọn quyền ---</option>
+                            @foreach (var perm in availablePermissions)
+                            {
+                                <option value="@perm.Id">@perm.Name (@perm.Code)</option>
+                            }
+                        </select>
+                        @if (selectedPermissionModel.PermissionId <= 0 && isSubmitted)
+                        {
+                            <div class="text-danger">Vui lòng chọn quyền.</div>
+                        }
+                    </div>
+
+                    <div class="form-group mb-3">
+                        <label for="permType" class="form-label">Loại quyền:</label>
+                        <select class="form-select" id="permType" @bind="selectedPermissionModel.Type">
+                            <option value="">--- Chọn loại quyền ---</option>
+                            <option value="Read">Đọc</option>
+                            <option value="Create">Tạo mới</option>
+                            <option value="Update">Cập nhật</option>
+                            <option value="Delete">Xóa</option>
+                            <option value="Admin">Quản trị</option>
+                        </select>
+                        @if (string.IsNullOrEmpty(selectedPermissionModel.Type) && isSubmitted)
+                        {
+                            <div class="text-danger">Vui lòng chọn loại quyền.</div>
+                        }
+                    </div>
+
+                    <div class="form-group mb-3">
+                        <label for="permScope" class="form-label">Phạm vi quyền:</label>
+                        <select class="form-select" id="permScope" @bind="selectedPermissionModel.Scope">
+                            <option value="">--- Chọn phạm vi quyền ---</option>
+                            <option value="All">Toàn hệ thống</option>
+                            <option value="Department">Phòng ban</option>
+                            <option value="Self">Cá nhân</option>
+                        </select>
+                        @if (string.IsNullOrEmpty(selectedPermissionModel.Scope) && isSubmitted)
+                        {
+                            <div class="text-danger">Vui lòng chọn phạm vi quyền.</div>
+                        }
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="ClosePermissionDialog">Đóng</button>
+                    <button type="button" class="btn btn-primary" @onclick="SaveUserPermission">
+                        <i class="bi bi-save"></i> @(isEditing ? "Cập nhật" : "Lưu")
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop fade show"></div>
+}
+
+@if (showDeleteConfirmation)
+{
+    <div class="modal fade show" style="display: block;" tabindex="-1" role="dialog">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title">Xác nhận xóa</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="() => showDeleteConfirmation = false" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Bạn có chắc chắn muốn xóa quyền <strong>@(permissionToDelete?.Name)</strong> khỏi người dùng này?</p>
+                    <p class="text-danger"><strong>Lưu ý:</strong> Hành động này không thể hoàn tác.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="() => showDeleteConfirmation = false">Hủy</button>
+                    <button type="button" class="btn btn-danger" @onclick="DeleteUserPermission">
+                        <i class="bi bi-trash"></i> Xóa
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop fade show"></div>
+}
+
+<div class="card mt-4 mb-4">
+    <div class="card-header bg-primary text-white">
+        <h5 class="mb-0">Công cụ kiểm tra dữ liệu quyền người dùng</h5>
+    </div>
+    <div class="card-body">
+        <div class="form-check form-switch mb-3">
+            <input class="form-check-input" type="checkbox" @bind="showDebugInfo" id="debugSwitch">
+            <label class="form-check-label" for="debugSwitch">Hiển thị thông tin debug</label>
+        </div>
+        
+        @if (showDebugInfo)
+        {
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0">Dữ liệu người dùng (@(users?.Count ?? 0) bản ghi)</h6>
+                        </div>
+                        <div class="card-body">
+                            <pre style="max-height: 300px; overflow: auto;">@(System.Text.Json.JsonSerializer.Serialize(users, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }))</pre>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0">Dữ liệu người dùng đã chọn</h6>
+                        </div>
+                        <div class="card-body">
+                            <pre style="max-height: 300px; overflow: auto;">@(System.Text.Json.JsonSerializer.Serialize(selectedUser, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }))</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row mt-3">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0">Dữ liệu quyền (@(availablePermissions?.Count ?? 0) bản ghi)</h6>
+                        </div>
+                        <div class="card-body">
+                            <pre style="max-height: 300px; overflow: auto;">@(System.Text.Json.JsonSerializer.Serialize(availablePermissions, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }))</pre>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0">Dữ liệu quyền người dùng (@(userPermissions?.Count ?? 0) bản ghi)</h6>
+                        </div>
+                        <div class="card-body">
+                            <pre style="max-height: 300px; overflow: auto;">@(System.Text.Json.JsonSerializer.Serialize(userPermissions, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }))</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row mt-3">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0">Kiểm tra API</h6>
+                            <button class="btn btn-primary btn-sm" @onclick="RefreshAllData">Làm mới dữ liệu</button>
+                        </div>
+                        <div class="card-body">
+                            <div class="input-group mb-3">
+                                <input type="text" class="form-control" placeholder="Endpoint cần kiểm tra (ví dụ: api/users/permissions)" @bind="testApiEndpoint">
+                                <button class="btn btn-outline-secondary" type="button" @onclick="TestApiEndpoint">Kiểm tra</button>
+                            </div>
+                            
+                            @if (!string.IsNullOrEmpty(testApiResult))
+                            {
+                                <div class="alert @(testApiSuccess ? "alert-success" : "alert-danger")">
+                                    <pre style="max-height: 200px; overflow: auto;">@testApiResult</pre>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h6 class="mb-0">Thông tin lọc & phân trang</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <p><strong>Tìm kiếm:</strong> @searchTerm</p>
+                            <p><strong>Loại quyền:</strong> @selectedType</p>
+                            <p><strong>User ID đang xem:</strong> @selectedUserId</p>
+                        </div>
+                        <div class="col-md-4">
+                            <p><strong>Trang hiện tại:</strong> @currentPage</p>
+                            <p><strong>Kích thước trang:</strong> @pageSize</p>
+                            <p><strong>Tổng số trang:</strong> @totalPages</p>
+                        </div>
+                        <div class="col-md-4">
+                            <p><strong>Tổng số quyền người dùng:</strong> @(userPermissions?.Count ?? 0)</p>
+                            <p><strong>Số quyền đã lọc:</strong> @filteredUserPermissions.Count()</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public string? UserId { get; set; }
+
+    private string selectedUserId = string.Empty;
+    private UserDto? selectedUser;
+    private List<UserDto>? users;
+    private List<Department>? departments;
+    private Dictionary<string, List<string>> userRoles = new();
+    
+    // for permission management
+    private List<UserPermissionDto>? userPermissions;
+    private List<UserPermissionDto>? filteredPermissions;
+    private UserPermissionDto? selectedPermission;
+
+    private bool isLoadingUsers = false;
+    private bool isLoadingPermissions = false;
+
+    private List<PermissionModel> availablePermissions = new List<PermissionModel>();
+    private IEnumerable<UserPermissionDto> filteredUserPermissions => 
+        (filteredPermissions ?? Enumerable.Empty<UserPermissionDto>())
+            .Where(p => string.IsNullOrEmpty(searchTerm) || 
+                p.Name.ToLower().Contains((searchTerm ?? "").ToLower()) || 
+                p.Code.ToLower().Contains((searchTerm ?? "").ToLower()))
+            .Where(p => string.IsNullOrEmpty(selectedType) || 
+                p.Type.ToString() == selectedType);
+
+    private string searchTerm = "";
+    private string selectedType = "";
+    private int currentPage = 1;
+    private int pageSize = 10;
+    private int totalPages => (int)Math.Ceiling(filteredUserPermissions.Count() / (double)pageSize);
+    private IEnumerable<UserPermissionDto> currentItems => filteredUserPermissions
+        .Skip((currentPage - 1) * pageSize)
+        .Take(pageSize);
+
+    private UserPermissionModel selectedPermissionModel = new UserPermissionModel();
+    private bool showPermissionDialog = false;
+    private bool isEditing = false;
+    private bool isSubmitted = false;
+
+    private UserPermissionDto? permissionToDelete;
+    private bool showDeleteConfirmation = false;
+    
+    // Debug properties
+    private bool showDebugInfo = false;
+    private string testApiEndpoint = "api/users/permissions";
+    private string testApiResult = "";
+    private bool testApiSuccess = false;
+
+    private bool isLoading = true;
+    private string errorMessage = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadInitialData();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            if (!string.IsNullOrEmpty(errorMessage))
+            {
+                await JSRuntime.InvokeVoidAsync("console.error", errorMessage);
+            }
+        }
+    }
+
+    private async Task LoadInitialData()
+    {
+        isLoading = true;
+        errorMessage = "";
+        try
+        {
+            await LoadUsers();
+            await LoadDepartments();
+            if (UserId != null)
+            {
+                await LoadUserPermissions();
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Lỗi khi tải dữ liệu: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadUsers()
+    {
+        try
+        {
+            users = await Http.GetFromJsonAsync<List<UserDto>>("api/users");
+            
+            // Load roles for each user
+            foreach (var user in users ?? Enumerable.Empty<UserDto>())
+            {
+                try
+                {
+                    var response = await Http.GetFromJsonAsync<UserRolesResponse>($"api/users/{user.Id}/roles");
+                    if (response != null && response.Roles != null)
+                    {
+                        userRoles[user.Id] = response.Roles;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    errorMessage += $"Không thể tải vai trò cho người dùng {user.Id}. ";
+                }
+            }
+            
+            if (UserId != null)
+            {
+                selectedUserId = UserId.ToString();
+                await HandleUserChange();
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Lỗi tải người dùng: {ex.Message}";
+            users = new List<UserDto>();
+        }
+    }
+    
+    private async Task LoadDepartments()
+    {
+        try
+        {
+            departments = await Http.GetFromJsonAsync<List<Department>>("api/departments");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Lỗi tải phòng ban: {ex.Message}";
+            departments = new List<Department>();
+        }
+    }
+    
+    private async Task LoadUserPermissions()
+    {
+        if (string.IsNullOrEmpty(selectedUserId))
+            return;
+            
+        try
+        {
+            isLoading = true;
+            userPermissions = await Http.GetFromJsonAsync<List<UserPermissionDto>>($"api/users/{selectedUserId}/permissions");
+            filteredPermissions = userPermissions?.ToList() ?? new List<UserPermissionDto>();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Lỗi tải quyền người dùng: {ex.Message}";
+            userPermissions = new List<UserPermissionDto>();
+            filteredPermissions = new List<UserPermissionDto>();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task HandleUserChange()
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(selectedUserId))
+                return;
+                
+            isLoading = true;
+            errorMessage = "";
+            StateHasChanged();
+            
+            // Load user data
+            var userData = users?.FirstOrDefault(u => u.Id == selectedUserId);
+            if (userData != null)
+            {
+                selectedUser = userData;
+                
+                // Navigate to user detail if we don't have UserId in URL
+                if (UserId == null)
+                {
+                    NavigationManager.NavigateTo($"/permissions/user/{selectedUserId}");
+                    return;
+                }
+            }
+            
+            // Load user permissions
+            await LoadUserPermissions();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Lỗi khi tải thông tin người dùng: {ex.Message}";
+            StateHasChanged();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ApplyFilters()
+    {
+        currentPage = 1;
+        StateHasChanged();
+    }
+
+    private void ChangePage(int page)
+    {
+        currentPage = page;
+    }
+
+    private async Task ShowAddPermissionDialog()
+    {
+        await LoadAvailablePermissions();
+        selectedPermissionModel = new UserPermissionModel
+        {
+            UserId = selectedUserId
+        };
+        isEditing = false;
+        isSubmitted = false;
+        showPermissionDialog = true;
+    }
+
+    private async Task EditUserPermission(UserPermissionDto permission)
+    {
+        await LoadAvailablePermissions();
+        selectedPermissionModel = new UserPermissionModel
+        {
+            Id = permission.Id,
+            UserId = selectedUserId,
+            PermissionId = permission.PermissionId,
+            Type = permission.Type,
+            Scope = permission.Scope
+        };
+        isEditing = true;
+        isSubmitted = false;
+        showPermissionDialog = true;
+    }
+
+    private void ClosePermissionDialog()
+    {
+        showPermissionDialog = false;
+    }
+
+    private async Task SaveUserPermission()
+    {
+        isSubmitted = true;
+
+        if (selectedPermissionModel.PermissionId <= 0 || 
+            string.IsNullOrEmpty(selectedPermissionModel.Type) ||
+            string.IsNullOrEmpty(selectedPermissionModel.Scope))
+        {
+            return;
+        }
+
+        try
+        {
+            HttpResponseMessage response;
+
+            if (isEditing)
+            {
+                response = await Http.PutAsJsonAsync($"api/users/permissions/{selectedPermissionModel.Id}", selectedPermissionModel);
+            }
+            else
+            {
+                response = await Http.PostAsJsonAsync("api/users/permissions", selectedPermissionModel);
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                await LoadUserPermissions();
+                ClosePermissionDialog();
+                await JSRuntime.InvokeVoidAsync("alert", $"Quyền đã được {(isEditing ? "cập nhật" : "thêm")} thành công!");
+            }
+            else
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                await JSRuntime.InvokeVoidAsync("alert", $"Lỗi khi {(isEditing ? "cập nhật" : "thêm")} quyền: {errorContent}");
+            }
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", $"Lỗi khi {(isEditing ? "cập nhật" : "thêm")} quyền: {ex.Message}");
+        }
+    }
+
+    private void ConfirmDeleteUserPermission(UserPermissionDto permission)
+    {
+        permissionToDelete = permission;
+        showDeleteConfirmation = true;
+    }
+
+    private async Task DeleteUserPermission()
+    {
+        if (permissionToDelete == null) return;
+
+        try
+        {
+            var response = await Http.DeleteAsync($"api/users/permissions/{permissionToDelete.Id}");
+
+            if (response.IsSuccessStatusCode)
+            {
+                await LoadUserPermissions();
+                showDeleteConfirmation = false;
+                await JSRuntime.InvokeVoidAsync("alert", "Quyền đã được xóa thành công!");
+            }
+            else
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                await JSRuntime.InvokeVoidAsync("alert", $"Lỗi khi xóa quyền: {errorContent}");
+            }
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", $"Lỗi khi xóa quyền: {ex.Message}");
+        }
+    }
+    
+    private async Task TestApiEndpoint()
+    {
+        try
+        {
+            testApiResult = "Đang tải...";
+            testApiSuccess = true;
+            StateHasChanged();
+            
+            var response = await Http.GetAsync(testApiEndpoint);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                testApiSuccess = true;
+                var content = await response.Content.ReadAsStringAsync();
+                // Prettify JSON if it's valid
+                try 
+                {
+                    var jsonObj = System.Text.Json.JsonDocument.Parse(content);
+                    content = System.Text.Json.JsonSerializer.Serialize(
+                        jsonObj, 
+                        new System.Text.Json.JsonSerializerOptions { WriteIndented = true }
+                    );
+                }
+                catch (Exception jsonEx)
+                {
+                    errorMessage = $"Lỗi khi phân tích JSON: {jsonEx.Message}";
+                    StateHasChanged();
+                }
+                
+                testApiResult = content;
+            }
+            else
+            {
+                testApiSuccess = false;
+                testApiResult = $"Lỗi: {response.StatusCode} - {await response.Content.ReadAsStringAsync()}";
+            }
+        }
+        catch (Exception ex)
+        {
+            testApiSuccess = false;
+            testApiResult = $"Lỗi: {ex.Message}";
+            errorMessage = $"Lỗi kiểm tra API: {ex.Message}";
+            StateHasChanged();
+        }
+    }
+    
+    private async Task RefreshAllData()
+    {
+        try
+        {
+            await LoadInitialData();
+            errorMessage = "Đã làm mới dữ liệu thành công!";
+            
+            // Chỉ gọi JavaScript sau khi render
+            await Task.Delay(100); // Đợi một chút để component render
+            await JSRuntime.InvokeVoidAsync("alert", errorMessage);
+            errorMessage = string.Empty;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Lỗi khi làm mới dữ liệu: {ex.Message}";
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadAvailablePermissions()
+    {
+        try
+        {
+            availablePermissions = await Http.GetFromJsonAsync<List<PermissionModel>>("api/permissions") ?? new();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Lỗi khi tải danh sách quyền: {ex.Message}";
+            StateHasChanged();
+        }
+    }
+
+    public class UserDto
+    {
+        public string Id { get; set; } = string.Empty;
+        public string UserName { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string FullName { get; set; } = string.Empty;
+        public int? DepartmentId { get; set; }
+        public string? DepartmentName { get; set; }
+        public bool IsActive { get; set; }
+        public List<string> Roles { get; set; } = new List<string>();
+    }
+
+    public class PermissionModel
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = "";
+        public string Code { get; set; } = "";
+        public string Description { get; set; } = "";
+        public string PermissionType { get; set; } = "";
+        public bool IsActive { get; set; }
+    }
+
+    public class UserPermissionDto
+    {
+        public int Id { get; set; }
+        public int PermissionId { get; set; }
+        public string Code { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public string Type { get; set; } = string.Empty;
+        public string Scope { get; set; } = string.Empty;
+        public int? ScopeDepartmentId { get; set; }
+        public bool IsSelfOnly { get; set; }
+        public DateTime AssignedDate { get; set; }
+    }
+
+    public class UserPermissionModel
+    {
+        public int Id { get; set; }
+        public string UserId { get; set; } = string.Empty;
+        public int PermissionId { get; set; }
+        public string Type { get; set; } = string.Empty;
+        public string ScopeType { get; set; } = string.Empty;
+        public int? ScopeDepartmentId { get; set; }
+        public string Scope { get; set; } = "All";
+    }
+
+    public class UserRolesResponse
+    {
+        public List<string> Roles { get; set; } = new List<string>();
+    }
+    
+    public enum PermissionType
+    {
+        View,
+        Create,
+        Edit,
+        Delete,
+        Admin
+    }
+    
+    public enum ScopeType
+    {
+        All,
+        Department,
+        Self
+    }
+    
+    public class Department
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public bool IsActive { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public DateTime? UpdatedAt { get; set; }
+    }
+} 
