@@ -10,7 +10,7 @@ namespace BlazorHybridApp.Domain.Entities
 
         [Required]
         [MaxLength(100)]
-        public string Username { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
 
         [Required]
         [MaxLength(100)]
@@ -19,13 +19,13 @@ namespace BlazorHybridApp.Domain.Entities
 
         [Required]
         [MaxLength(255)]
-        public string PasswordHash { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
 
-        [MaxLength(100)]
-        public string? FirstName { get; set; }
+        [MaxLength(200)]
+        public string? Address { get; set; }
 
-        [MaxLength(100)]
-        public string? LastName { get; set; }
+        [MaxLength(20)]
+        public string? Phone { get; set; }
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         

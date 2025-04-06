@@ -15,3 +15,4 @@
 /Users/ThangPham/HUB/BlazorHybridApp/BlazorHybridApp.Core/obj/Debug/net8.0/ref/BlazorHybridApp.Core.dll
 /Users/ThangPham/HUB/BlazorHybridApp/BlazorHybridApp.Core/bin/Debug/net8.0/BlazorHybridApp.Core.runtimeconfig.json
 /Users/ThangPham/HUB/BlazorHybridApp/BlazorHybridApp.Core/obj/Debug/net8.0/BlazorHybridApp.Core.genruntimeconfig.cache
+/Users/ThangPham/HUB/BlazorHybridApp/BlazorHybridApp.Core/obj/Debug/net8.0/BlazorHybridApp.Core.sourcelink.json

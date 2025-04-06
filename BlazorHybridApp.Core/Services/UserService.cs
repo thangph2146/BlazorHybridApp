@@ -1,91 +1,206 @@
+using System.Security.Cryptography;
+using System.Text;
 using BlazorHybridApp.Core.Data;
 using BlazorHybridApp.Core.Interfaces;
 using BlazorHybridApp.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
-using System.Security.Cryptography;
-using System.Text;
+using Microsoft.Extensions.Logging;
 
 namespace BlazorHybridApp.Core.Services
 {
     public class UserService : IUserService
     {
         private readonly AppDbContext _context;
+        private readonly ILogger<UserService> _logger;
 
-        public UserService(AppDbContext context)
+        public UserService(AppDbContext context, ILogger<UserService> logger)
         {
             _context = context;
+            _logger = logger;
         }
 
         public async Task<IEnumerable<User>> GetAllUsersAsync()
         {
-            return await _context.Users.ToListAsync();
+            try
+            {
+                return await _context.Users.ToListAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi lấy danh sách người dùng");
+                return Enumerable.Empty<User>();
+            }
         }
 
-        public async Task<User> GetUserByIdAsync(int id)
+        public async Task<User?> GetUserByIdAsync(int id)
         {
-            return await _context.Users.FindAsync(id);
+            try
+            {
+                return await _context.Users.FindAsync(id);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi lấy người dùng id={UserId}", id);
+                return null;
+            }
         }
 
-        public async Task<User> GetUserByEmailAsync(string email)
+        public async Task<User?> GetUserByEmailAsync(string email)
         {
-            return await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
+            try
+            {
+                return await _context.Users
+                    .FirstOrDefaultAsync(u => u.Email == email);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi lấy người dùng theo email={Email}", email);
+                return null;
+            }
         }
 
         public async Task<User> CreateUserAsync(User user)
         {
-            // Hash password before saving
-            user.PasswordHash = HashPassword(user.PasswordHash);
-            
-            _context.Users.Add(user);
-            await _context.SaveChangesAsync();
-            return user;
+            try
+            {
+                // Kiểm tra xem email đã tồn tại chưa
+                var existingUser = await _context.Users
+                    .FirstOrDefaultAsync(u => u.Email == user.Email);
+                
+                if (existingUser != null)
+                {
+                    throw new InvalidOperationException("Email đã tồn tại");
+                }
+
+                // Hash mật khẩu trước khi lưu
+                user.Password = HashPassword(user.Password);
+                
+                _context.Users.Add(user);
+                await _context.SaveChangesAsync();
+                return user;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi tạo người dùng mới");
+                throw;
+            }
         }
 
         public async Task<User> UpdateUserAsync(User user)
         {
-            // If password is being updated, hash it
-            var existingUser = await _context.Users.FindAsync(user.Id);
-            if (existingUser != null && user.PasswordHash != existingUser.PasswordHash)
+            try
             {
-                user.PasswordHash = HashPassword(user.PasswordHash);
+                var existingUser = await _context.Users.FindAsync(user.Id);
+                if (existingUser == null)
+                {
+                    throw new KeyNotFoundException($"Không tìm thấy người dùng với ID {user.Id}");
+                }
+
+                // Cập nhật thông tin người dùng
+                existingUser.Name = user.Name;
+                existingUser.Email = user.Email;
+                
+                // Chỉ cập nhật mật khẩu nếu nó được thay đổi
+                if (!string.IsNullOrEmpty(user.Password) && user.Password != existingUser.Password)
+                {
+                    existingUser.Password = HashPassword(user.Password);
+                }
+                
+                // Cập nhật các thông tin khác
+                existingUser.Address = user.Address;
+                existingUser.Phone = user.Phone;
+                existingUser.Role = user.Role;
+
+                await _context.SaveChangesAsync();
+                return existingUser;
             }
-            
-            _context.Entry(user).State = EntityState.Modified;
-            await _context.SaveChangesAsync();
-            return user;
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi cập nhật người dùng id={UserId}", user.Id);
+                throw;
+            }
         }
 
         public async Task<bool> DeleteUserAsync(int id)
         {
-            var user = await _context.Users.FindAsync(id);
-            if (user == null)
-                return false;
+            try
+            {
+                var user = await _context.Users.FindAsync(id);
+                if (user == null)
+                {
+                    return false;
+                }
 
-            _context.Users.Remove(user);
-            await _context.SaveChangesAsync();
-            return true;
+                _context.Users.Remove(user);
+                await _context.SaveChangesAsync();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi xóa người dùng id={UserId}", id);
+                return false;
+            }
         }
 
         public async Task<bool> AuthenticateUserAsync(string email, string password)
         {
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
-            if (user == null)
-                return false;
+            try
+            {
+                var user = await _context.Users
+                    .FirstOrDefaultAsync(u => u.Email == email);
 
-            return VerifyPassword(password, user.PasswordHash);
+                if (user == null)
+                {
+                    return false;
+                }
+
+                // Kiểm tra mật khẩu
+                return VerifyPassword(password, user.Password);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi khi xác thực người dùng email={Email}", email);
+                return false;
+            }
         }
 
+        // Phương thức hash mật khẩu sử dụng SHA256 + salt
         private string HashPassword(string password)
         {
-            using var sha256 = SHA256.Create();
-            var hashedBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(password));
-            return Convert.ToBase64String(hashedBytes);
+            if (string.IsNullOrEmpty(password))
+            {
+                throw new ArgumentNullException(nameof(password));
+            }
+
+            // Tạo salt ngẫu nhiên (trong thực tế, salt nên được lưu cùng password)
+            string salt = "BlazorHybridAppSalt"; // Đây chỉ là ví dụ, nên sử dụng salt ngẫu nhiên và lưu cùng password
+            
+            using (var sha256 = SHA256.Create())
+            {
+                var saltedPassword = string.Concat(password, salt);
+                var hashedBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(saltedPassword));
+                return Convert.ToBase64String(hashedBytes);
+            }
         }
 
-        private bool VerifyPassword(string password, string hashedPassword)
+        // Phương thức xác thực mật khẩu
+        private bool VerifyPassword(string enteredPassword, string storedHash)
         {
-            var hashedInput = HashPassword(password);
-            return hashedInput == hashedPassword;
+            if (string.IsNullOrEmpty(enteredPassword) || string.IsNullOrEmpty(storedHash))
+            {
+                return false;
+            }
+
+            string salt = "BlazorHybridAppSalt"; // Salt giống với phương thức HashPassword
+            
+            using (var sha256 = SHA256.Create())
+            {
+                var saltedPassword = string.Concat(enteredPassword, salt);
+                var hashedBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(saltedPassword));
+                var hashedPassword = Convert.ToBase64String(hashedBytes);
+                
+                return hashedPassword == storedHash;
+            }
         }
     }
 } 

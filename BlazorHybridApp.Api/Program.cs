@@ -1,8 +1,10 @@
 using BlazorHybridApp.Core.Data;
 using BlazorHybridApp.Core.Interfaces;
 using BlazorHybridApp.Core.Services;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json.Serialization;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -30,11 +32,35 @@ builder.Services.AddSwaggerGen();
 // Add CORS
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAll", 
+    options.AddPolicy("CorsPolicy", 
         builder => builder
-            .AllowAnyOrigin()
+            .WithOrigins(
+                "https://localhost:5001", 
+                "http://localhost:5000", 
+                "https://localhost:5000",
+                "http://localhost:5235",
+                "https://localhost:5235",
+                "http://localhost:5173",
+                "https://localhost:5173")
             .AllowAnyMethod()
-            .AllowAnyHeader());
+            .AllowAnyHeader()
+            .AllowCredentials());
+});
+
+// Add logging
+builder.Logging.AddConsole();
+builder.Logging.AddDebug();
+
+// Add rate limiting for .NET 8
+builder.Services.AddRateLimiter(options =>
+{
+    options.AddFixedWindowLimiter("fixed", options =>
+    {
+        options.PermitLimit = 100;
+        options.Window = TimeSpan.FromMinutes(1);
+        options.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        options.QueueLimit = 0;
+    });
 });
 
 var app = builder.Build();
@@ -44,19 +70,23 @@ if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
+    app.UseDeveloperExceptionPage();
+}
+else
+{
+    app.UseExceptionHandler("/error");
+    app.UseHsts();
 }
 
 app.UseHttpsRedirection();
 
-app.UseCors("AllowAll");
+app.UseCors("CorsPolicy");
+
+app.UseRateLimiter();
 
 app.UseAuthorization();
 
-app.MapControllers();
+app.MapControllers()
+   .RequireRateLimiting("fixed");
 
 app.Run();
-
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}

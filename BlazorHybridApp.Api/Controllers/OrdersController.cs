@@ -99,6 +99,12 @@ namespace BlazorHybridApp.Api.Controllers
 
     public class StatusUpdateRequest
     {
-        public string Status { get; set; }
+        public required string Status { get; set; }
+    }
+
+    public class OrderStatus
+    {
+        public int Id { get; set; }
+        public required string Status { get; set; }
     }
 } 

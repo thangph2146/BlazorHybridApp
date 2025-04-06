@@ -30,7 +30,7 @@ else
                 {
                     <tr>
                         <td>@order.Id</td>
-                        <td>@(order.User?.Username ?? $"User #{order.UserId}")</td>
+                        <td>@(order.User?.Name ?? $"User #{order.UserId}")</td>
                         <td>@order.OrderDate.ToShortDateString()</td>
                         <td>@order.Status</td>
                         <td>@order.TotalAmount.ToString("C")</td>

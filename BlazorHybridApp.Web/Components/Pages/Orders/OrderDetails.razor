@@ -44,7 +44,7 @@ else
                     {
                         <dl class="row">
                             <dt class="col-sm-4">Name:</dt>
-                            <dd class="col-sm-8">@order.User.Username</dd>
+                            <dd class="col-sm-8">@order.User.Name</dd>
 
                             <dt class="col-sm-4">Email:</dt>
                             <dd class="col-sm-8">@order.User.Email</dd>
@@ -75,7 +75,7 @@ else
                 </tr>
             </thead>
             <tbody>
-                @if (order.OrderItems != null)
+                @if (order.OrderItems != null && order.OrderItems.Any())
                 {
                     @foreach (var item in order.OrderItems)
                     {
@@ -158,6 +158,9 @@ else
 
     private async Task UpdateOrderStatus()
     {
+        if (order == null || string.IsNullOrEmpty(newStatus))
+            return;
+            
         try
         {
             var statusRequest = new { Status = newStatus };

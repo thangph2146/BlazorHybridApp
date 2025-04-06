@@ -2,10 +2,18 @@
 @using BlazorHybridApp.Domain.Entities
 @rendermode InteractiveAuto
 @inject HttpClient Http
+@inject NavigationManager NavigationManager
 
 <PageTitle>Sản phẩm</PageTitle>
 
 <h1>Danh sách sản phẩm</h1>
+
+@if (errorMessage != null)
+{
+    <div class="alert alert-danger">
+        @errorMessage
+    </div>
+}
 
 @if (products == null)
 {
@@ -25,7 +33,7 @@ else
     </div>
 
     <div class="row">
-        @foreach (var product in filteredProducts)
+        @foreach (var product in filteredProducts ?? Enumerable.Empty<Product>())
         {
             <div class="col-md-4 mb-4">
                 <div class="card h-100">
@@ -56,6 +64,7 @@ else
     private List<Product>? products;
     private List<Product>? filteredProducts;
     private string searchTerm = "";
+    private string? errorMessage;
 
     protected override async Task OnInitializedAsync()
     {
@@ -63,23 +72,24 @@ else
         {
             products = await Http.GetFromJsonAsync<List<Product>>("api/products");
             filteredProducts = products;
+            errorMessage = null;
         }
         catch (Exception ex)
         {
+            errorMessage = $"Không thể tải danh sách sản phẩm: {ex.Message}";
             Console.WriteLine($"Error loading products: {ex.Message}");
-            // Trong môi trường thực tế, bạn nên xử lý lỗi tốt hơn
         }
     }
 
     private void FilterProducts()
     {
-        if (string.IsNullOrWhiteSpace(searchTerm))
+        if (string.IsNullOrWhiteSpace(searchTerm) || products == null)
         {
             filteredProducts = products;
         }
         else
         {
-            filteredProducts = products?
+            filteredProducts = products
                 .Where(p => p.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
                            (p.Description != null && p.Description.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)))
                 .ToList();
@@ -88,11 +98,13 @@ else
 
     private void ViewProductDetails(int productId)
     {
-        // Chuyển hướng đến trang chi tiết sản phẩm
+        NavigationManager.NavigateTo($"/products/{productId}");
     }
 
     private void AddToCart(Product product)
     {
-        // Thêm sản phẩm vào giỏ hàng
+        // Tạm thời hiển thị thông báo đến console
+        Console.WriteLine($"Đã thêm sản phẩm {product.Name} vào giỏ hàng");
+        // Trong một ứng dụng thực tế, nên gọi service quản lý giỏ hàng
     }
 } 

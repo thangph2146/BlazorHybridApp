@@ -16,14 +16,14 @@ namespace BlazorHybridApp.Api.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<User>>> GetUsers()
+        public async Task<ActionResult<IEnumerable<UserDto>>> GetUsers()
         {
             var users = await _userService.GetAllUsersAsync();
-            return Ok(users);
+            return Ok(users.Select(u => ConvertToDto(u)));
         }
 
         [HttpGet("{id}")]
-        public async Task<ActionResult<User>> GetUser(int id)
+        public async Task<ActionResult<UserDto>> GetUser(int id)
         {
             var user = await _userService.GetUserByIdAsync(id);
             if (user == null)
@@ -31,13 +31,11 @@ namespace BlazorHybridApp.Api.Controllers
                 return NotFound();
             }
             
-            // Don't return password in response
-            user.PasswordHash = null;
-            return Ok(user);
+            return Ok(ConvertToDto(user));
         }
 
         [HttpGet("email/{email}")]
-        public async Task<ActionResult<User>> GetUserByEmail(string email)
+        public async Task<ActionResult<UserDto>> GetUserByEmail(string email)
         {
             var user = await _userService.GetUserByEmailAsync(email);
             if (user == null)
@@ -45,13 +43,11 @@ namespace BlazorHybridApp.Api.Controllers
                 return NotFound();
             }
             
-            // Don't return password in response
-            user.PasswordHash = null;
-            return Ok(user);
+            return Ok(ConvertToDto(user));
         }
 
         [HttpPost]
-        public async Task<ActionResult<User>> CreateUser(User user)
+        public async Task<ActionResult<UserDto>> CreateUser(User user)
         {
             // Check if email already exists
             var existingUser = await _userService.GetUserByEmailAsync(user.Email);
@@ -62,13 +58,11 @@ namespace BlazorHybridApp.Api.Controllers
 
             var createdUser = await _userService.CreateUserAsync(user);
             
-            // Don't return password in response
-            createdUser.PasswordHash = null;
-            return CreatedAtAction(nameof(GetUser), new { id = createdUser.Id }, createdUser);
+            return CreatedAtAction(nameof(GetUser), new { id = createdUser.Id }, ConvertToDto(createdUser));
         }
 
         [HttpPut("{id}")]
-        public async Task<ActionResult<User>> UpdateUser(int id, User user)
+        public async Task<ActionResult<UserDto>> UpdateUser(int id, User user)
         {
             if (id != user.Id)
             {
@@ -77,9 +71,7 @@ namespace BlazorHybridApp.Api.Controllers
 
             var updatedUser = await _userService.UpdateUserAsync(user);
             
-            // Don't return password in response
-            updatedUser.PasswordHash = null;
-            return Ok(updatedUser);
+            return Ok(ConvertToDto(updatedUser));
         }
 
         [HttpDelete("{id}")]
@@ -104,16 +96,49 @@ namespace BlazorHybridApp.Api.Controllers
             }
 
             var user = await _userService.GetUserByEmailAsync(request.Email);
+            if (user == null)
+            {
+                return Unauthorized();
+            }
             
-            // Don't return password in response
-            user.PasswordHash = null;
-            return Ok(new { user });
+            return Ok(new { user = ConvertToDto(user) });
         }
+
+        // Helper method to convert User to UserDto (without password)
+        private UserDto ConvertToDto(User user)
+        {
+            return new UserDto
+            {
+                Id = user.Id,
+                Name = user.Name,
+                Email = user.Email,
+                Address = user.Address,
+                Phone = user.Phone,
+                CreatedAt = user.CreatedAt,
+                LastLoginAt = user.LastLoginAt,
+                IsActive = user.IsActive,
+                Role = user.Role
+            };
+        }
+    }
+
+    // DTO for User without password
+    public class UserDto
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string? Address { get; set; }
+        public string? Phone { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public DateTime? LastLoginAt { get; set; }
+        public bool IsActive { get; set; }
+        public string? Role { get; set; }
     }
 
     public class AuthRequest
     {
-        public string Email { get; set; }
-        public string Password { get; set; }
+        public string Email { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
     }
 } 
