@@ -30,24 +30,11 @@ namespace BlazorHybridApp.Api.Controllers
         }
 
         [HttpGet]
-        [Authorize]
+        [AllowAnonymous]
         public async Task<ActionResult<IEnumerable<Department>>> GetDepartments()
         {
             try
             {
-                var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-                if (string.IsNullOrEmpty(userId))
-                {
-                    return Unauthorized(new { message = "Không tìm thấy thông tin người dùng" });
-                }
-
-                // Kiểm tra người dùng có quyền xem danh sách phòng ban không
-                var hasPermission = await _permissionService.HasPermissionAsync(userId, "departments.view");
-                if (!hasPermission)
-                {
-                    return Forbid();
-                }
-
                 return await _context.Departments.ToListAsync();
             }
             catch (Exception ex)

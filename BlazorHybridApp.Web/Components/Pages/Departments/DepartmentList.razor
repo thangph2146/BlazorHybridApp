@@ -386,7 +386,7 @@ else
     // Filtering
     private string searchTerm = "";
     private string activeFilter = "";
-    private IEnumerable<Department> filteredDepartments => FilterDepartments();
+    private List<Department> filteredDepartments = new List<Department>();
     
     // Pagination
     private int currentPage = 1;
@@ -421,19 +421,15 @@ else
     
     private async Task LoadInitialData()
     {
-        isLoading = true;
-        errorMessage = "";
         try
         {
+            errorMessage = "";
             await LoadDepartments();
-            if (departments != null && departments.Count > 0)
-            {
-                await GetDepartmentUsers(departments[0].Id);
-            }
+            filteredDepartments = FilterDepartments();
         }
         catch (Exception ex)
         {
-            errorMessage = $"Lỗi khi tải dữ liệu: {ex.Message}";
+            errorMessage = $"Lỗi tải dữ liệu: {ex.Message}";
         }
         finally
         {
@@ -443,14 +439,32 @@ else
     
     private async Task LoadDepartments()
     {
-        try 
+        isLoading = true;
+        try
         {
-            departments = await Http.GetFromJsonAsync<List<Department>>("api/departments");
+            var response = await Http.GetAsync("api/department");
+            
+            if (response.IsSuccessStatusCode)
+            {
+                departments = await response.Content.ReadFromJsonAsync<List<Department>>();
+                filteredDepartments = departments ?? new List<Department>();
+            }
+            else
+            {
+                errorMessage = $"Không thể tải danh sách phòng ban. Mã lỗi: {response.StatusCode}";
+                departments = new List<Department>();
+                filteredDepartments = new List<Department>();
+            }
         }
         catch (Exception ex)
         {
             errorMessage = $"Lỗi tải phòng ban: {ex.Message}";
             departments = new List<Department>();
+            filteredDepartments = new List<Department>();
+        }
+        finally
+        {
+            isLoading = false;
         }
     }
     
@@ -621,53 +635,44 @@ else
     
     private void ChangePage(int page)
     {
-        if (page < 1 || page > totalPages)
-            return;
-            
-        currentPage = page;
+        currentPage = Math.Max(1, Math.Min(page, totalPages));
     }
     
     private void HandleSearch(KeyboardEventArgs e)
     {
         if (e.Key == "Enter")
+        {
             SearchDepartments();
+        }
     }
     
     private void SearchDepartments()
     {
+        filteredDepartments = FilterDepartments();
         currentPage = 1;
     }
     
-    private IEnumerable<Department> FilterDepartments()
+    private List<Department> FilterDepartments()
     {
-        if (departments == null)
-            return Enumerable.Empty<Department>();
-            
-        var filtered = departments.AsEnumerable();
+        var result = departments ?? new List<Department>();
         
         // Apply search filter
         if (!string.IsNullOrWhiteSpace(searchTerm))
         {
-            var term = searchTerm.Trim().ToLower();
-            filtered = filtered.Where(d => 
-                (d.Name?.ToLower()?.Contains(term) ?? false) || 
-                (d.Description != null && d.Description.ToLower().Contains(term))
-            );
+            result = result.Where(d => 
+                d.Name?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) == true || 
+                d.Description?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) == true
+            ).ToList();
         }
         
-        // Apply active filter
+        // Apply active status filter
         if (!string.IsNullOrEmpty(activeFilter))
         {
-            bool isActive = activeFilter.Equals("true", StringComparison.OrdinalIgnoreCase);
-            filtered = filtered.Where(d => d.IsActive == isActive);
+            bool isActive = activeFilter == "true";
+            result = result.Where(d => d.IsActive == isActive).ToList();
         }
         
-        // Apply pagination
-        var paged = filtered
-            .Skip((currentPage - 1) * pageSize)
-            .Take(pageSize);
-            
-        return paged;
+        return result;
     }
     
     public class DepartmentModel

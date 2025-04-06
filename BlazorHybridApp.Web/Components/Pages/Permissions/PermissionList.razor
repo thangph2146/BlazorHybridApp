@@ -589,11 +589,24 @@ else
     {
         try
         {
-            departments = await Http.GetFromJsonAsync<List<Department>>("api/departments");
+            var response = await Http.GetAsync("api/department");
+            
+            if (response.IsSuccessStatusCode)
+            {
+                departments = await response.Content.ReadFromJsonAsync<List<Department>>();
+            }
+            else
+            {
+                // Không hiển thị lỗi tải phòng ban lên giao diện
+                departments = new List<Department>();
+                Console.WriteLine($"Không thể tải danh sách phòng ban. Mã lỗi: {response.StatusCode}");
+            }
         }
         catch (Exception ex)
         {
-            errorMessage = $"Lỗi: {ex.Message}";
+            // Đặt departments = danh sách trống để tránh lỗi hiển thị
+            departments = new List<Department>();
+            Console.WriteLine($"Lỗi tải phòng ban: {ex.Message}");
         }
     }
     
